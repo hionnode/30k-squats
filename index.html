@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0a">
+<title>30K Squats 2026</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #1a1a1a;
+  --surface2: #252525;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --accent: #4fc3f7;
+  --accent2: #81c784;
+  --danger: #ef5350;
+  --warning: #ffb74d;
+  --radius: 12px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 32px;
+}
+
+/* Header */
+header {
+  text-align: center;
+  padding: 12px 0 8px;
+}
+header h1 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Camera Section */
+.camera-section {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  max-height: 50vh;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 12px 0;
+}
+.camera-section video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.camera-section canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+}
+.camera-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.camera-placeholder svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.4;
+}
+.camera-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.6);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.camera-status.error { color: var(--danger); }
+.flip-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  border: none;
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: none;
+}
+.flip-btn.visible { display: block; }
+
+/* Session Count */
+.session-count {
+  text-align: center;
+  padding: 8px 0;
+}
+.session-count .count {
+  font-size: 4rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: white;
+}
+.session-count .label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+}
+.btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.btn:active { transform: scale(0.96); }
+.btn-start {
+  background: var(--accent2);
+  color: #000;
+}
+.btn-stop {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-manual {
+  background: var(--surface2);
+  color: var(--text);
+  flex: 0 0 auto;
+  width: 56px;
+  font-size: 1.4rem;
+  padding: 10px;
+}
+.btn-manual.minus { color: var(--danger); }
+
+/* Progress */
+.progress-section {
+  margin: 16px 0 12px;
+}
+.progress-bar-bg {
+  height: 24px;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 12px;
+  transition: width 0.5s ease;
+  min-width: 2px;
+}
+.progress-text {
+  text-align: center;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.progress-text strong {
+  color: var(--text);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+.stat-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+}
+.stat-card .value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.stat-card.pace .value.behind { color: var(--warning); }
+.stat-card.pace .value.ahead { color: var(--accent2); }
+
+/* Calendar Heatmap */
+.heatmap-section {
+  margin: 16px 0;
+}
+.heatmap-section h3 {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.heatmap-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.heatmap-svg {
+  display: block;
+}
+
+/* Settings */
+.settings-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: var(--surface);
+  border: none;
+  color: var(--text-dim);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  cursor: pointer;
+  z-index: 100;
+}
+.settings-panel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  overflow-y: auto;
+  padding: 20px;
+}
+.settings-panel.open { display: flex; flex-direction: column; align-items: center; }
+.settings-content {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+}
+.settings-content h2 {
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+}
+.settings-content .setting-row {
+  margin-bottom: 16px;
+}
+.settings-content label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.settings-content input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.settings-content .btn-settings {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.btn-export { background: var(--surface2); color: var(--text); }
+.btn-import { background: var(--surface2); color: var(--text); }
+.btn-reset { background: var(--danger); color: #fff; }
+.btn-close-settings { background: var(--accent); color: #000; margin-top: 8px; }
+
+.sensitivity-value {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--surface2);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 300;
+  transition: transform 0.3s ease;
+  pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Skeleton overlay colors */
+.skeleton-line { stroke: var(--accent); stroke-width: 3; }
+.skeleton-point { fill: var(--accent2); }
+</style>
+</head>
+<body>
+
+<button class="settings-toggle" onclick="toggleSettings()" aria-label="Settings">⚙</button>
+
+<div class="container">
+  <header>
+    <h1>30K SQUATS 2026</h1>
+  </header>
+
+  <div class="camera-section" id="cameraSection">
+    <div class="camera-placeholder" id="cameraPlaceholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9A2.25 2.25 0 004.5 18.75z"/>
+      </svg>
+      <span>Camera activates when session starts</span>
+    </div>
+    <video id="video" autoplay playsinline style="display:none"></video>
+    <canvas id="overlay" style="display:none"></canvas>
+    <div class="camera-status" id="cameraStatus" style="display:none"></div>
+    <button class="flip-btn" id="flipBtn" onclick="flipCamera()" aria-label="Flip camera">⟲</button>
+  </div>
+
+  <div class="session-count">
+    <div class="count" id="sessionCount">0</div>
+    <div class="label">this session</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-manual minus" onclick="manualAdd(-1)">−</button>
+    <button class="btn btn-start" id="mainBtn" onclick="toggleSession()">START SESSION</button>
+    <button class="btn btn-manual" onclick="manualAdd(1)">+</button>
+  </div>
+
+  <div class="progress-section">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <div class="progress-text" id="progressText">0 / 30,000 (0.0%)</div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="value" id="statToday">0</div>
+      <div class="label">Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="statWeek">0</div>
+      <div class="label">This Week</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="statMonth">0</div>
+      <div class="label">This Month</div>
+    </div>
+    <div class="stat-card pace">
+      <div class="value" id="statPace">-</div>
+      <div class="label">Per Day Needed</div>
+    </div>
+  </div>
+
+  <div class="stat-card" style="margin: 12px 0; text-align:center;">
+    <div class="value" id="statDelta" style="font-size:1.1rem;">-</div>
+    <div class="label" id="statDeltaLabel">vs expected pace</div>
+  </div>
+
+  <div class="heatmap-section">
+    <h3>Year at a Glance</h3>
+    <div class="heatmap-container" id="heatmapContainer"></div>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-content">
+    <h2>Settings</h2>
+    <div class="setting-row">
+      <label>Squat Depth Sensitivity</label>
+      <input type="range" id="sensitivitySlider" min="100" max="140" value="120" oninput="updateSensitivity(this.value)">
+      <div class="sensitivity-value" id="sensitivityLabel">120°</div>
+    </div>
+    <button class="btn-settings btn-export" onclick="exportData()">Export Data (JSON)</button>
+    <button class="btn-settings btn-import" onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn-settings btn-reset" onclick="resetData()">Reset All Data</button>
+    <button class="btn-settings btn-close-settings" onclick="toggleSettings()">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+// ============ DATA LAYER ============
+const STORAGE_KEY = 'squats30k';
+const YEAR = 2026;
+const GOAL = 30000;
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d.year === YEAR) return d;
+    }
+  } catch (e) { console.error('Failed to load data', e); }
+  return { year: YEAR, goal: GOAL, sessions: [] };
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) { console.error('Failed to save', e); }
+}
+
+let data = loadData();
+
+function getDateStr(d) {
+  const dt = d || new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+function getOrCreateSession(dateStr) {
+  let session = data.sessions.find(s => s.date === dateStr);
+  if (!session) {
+    session = { date: dateStr, entries: [] };
+    data.sessions.push(session);
+  }
+  return session;
+}
+
+function totalSquats() {
+  let t = 0;
+  for (const s of data.sessions) for (const e of s.entries) t += e.count;
+  return t;
+}
+
+function squatsForDate(dateStr) {
+  const s = data.sessions.find(s => s.date === dateStr);
+  if (!s) return 0;
+  let t = 0;
+  for (const e of s.entries) t += e.count;
+  return t;
+}
+
+function squatsInRange(startDate, endDate) {
+  let t = 0;
+  for (const s of data.sessions) {
+    if (s.date >= startDate && s.date <= endDate) {
+      for (const e of s.entries) t += e.count;
+    }
+  }
+  return t;
+}
+
+// ISO week: Monday-Sunday
+function getWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return [getDateStr(monday), getDateStr(sunday)];
+}
+
+function getMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return [getDateStr(start), getDateStr(end)];
+}
+
+function dayOfYear() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now - start;
+  return Math.floor(diff / 86400000);
+}
+
+function daysRemaining() {
+  const now = new Date();
+  const end = new Date(YEAR, 11, 31);
+  const diff = end - now;
+  return Math.max(1, Math.ceil(diff / 86400000));
+}
+
+// ============ UI STATE ============
+let sessionActive = false;
+let sessionStartDate = null;
+let sessionStartTime = null;
+let currentSessionCount = 0;
+
+// ============ STATS & RENDERING ============
+function updateUI() {
+  const total = totalSquats();
+  const pct = Math.min(100, (total / GOAL) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').innerHTML =
+    `<strong>${total.toLocaleString()}</strong> / ${GOAL.toLocaleString()} (${pct.toFixed(1)}%)`;
+
+  document.getElementById('sessionCount').textContent = currentSessionCount;
+
+  const remaining = GOAL - total;
+  const perDay = remaining > 0 ? Math.ceil(remaining / daysRemaining()) : 0;
+  document.getElementById('statPace').textContent = perDay.toLocaleString();
+
+  const today = getDateStr();
+  const todayCount = squatsForDate(today);
+  document.getElementById('statToday').textContent = `${todayCount.toLocaleString()} / ${perDay.toLocaleString()}`;
+
+  const [weekStart, weekEnd] = getWeekRange();
+  const weekCount = squatsInRange(weekStart, weekEnd);
+  const now = new Date();
+  const dow = now.getDay();
+  const daysInWeek = 7;
+  const weekTarget = perDay * daysInWeek;
+  document.getElementById('statWeek').textContent = `${weekCount.toLocaleString()} / ${weekTarget.toLocaleString()}`;
+
+  const [monthStart, monthEnd] = getMonthRange();
+  const monthCount = squatsInRange(monthStart, monthEnd);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthTarget = perDay * daysInMonth;
+  document.getElementById('statMonth').textContent = `${monthCount.toLocaleString()} / ${monthTarget.toLocaleString()}`;
+
+  const expected = Math.round((dayOfYear() / 365) * GOAL);
+  const delta = total - expected;
+  const deltaEl = document.getElementById('statDelta');
+  if (delta >= 0) {
+    deltaEl.textContent = `${delta.toLocaleString()} ahead of schedule`;
+    deltaEl.style.color = 'var(--accent2)';
+  } else {
+    deltaEl.textContent = `${perDay.toLocaleString()}/day to hit 30K`;
+    deltaEl.style.color = 'var(--warning)';
+  }
+
+  renderHeatmap();
+}
+
+// ============ CALENDAR HEATMAP ============
+function renderHeatmap() {
+  const cellSize = 13;
+  const cellGap = 2;
+  const step = cellSize + cellGap;
+
+  // Collect daily totals
+  const dailyTotals = {};
+  for (const s of data.sessions) {
+    let t = 0;
+    for (const e of s.entries) t += e.count;
+    dailyTotals[s.date] = t;
+  }
+
+  // Find max for color scaling
+  let maxDay = 1;
+  for (const v of Object.values(dailyTotals)) if (v > maxDay) maxDay = v;
+
+  // Start from Jan 1
+  const jan1 = new Date(YEAR, 0, 1);
+  const startDow = (jan1.getDay() + 6) % 7; // Monday=0
+
+  const today = getDateStr();
+  let weeks = 53;
+  let svgW = weeks * step + 30;
+  let svgH = 7 * step + 20;
+
+  let rects = '';
+  const monthLabels = [];
+  let lastMonth = -1;
+
+  const d = new Date(jan1);
+  while (d.getFullYear() === YEAR) {
+    const dateStr = getDateStr(d);
+    const dow = (d.getDay() + 6) % 7;
+    const dayNum = Math.floor((d - jan1) / 86400000);
+    const weekNum = Math.floor((dayNum + startDow) / 7);
+    const x = weekNum * step + 28;
+    const y = dow * step;
+
+    const count = dailyTotals[dateStr] || 0;
+    let fill;
+    if (dateStr > today) {
+      fill = '#161616';
+    } else if (count === 0) {
+      fill = '#1e1e1e';
+    } else {
+      const intensity = Math.min(1, count / Math.max(maxDay, 50));
+      if (intensity < 0.25) fill = '#0e4429';
+      else if (intensity < 0.5) fill = '#006d32';
+      else if (intensity < 0.75) fill = '#26a641';
+      else fill = '#39d353';
+    }
+
+    rects += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${fill}"><title>${dateStr}: ${count}</title></rect>`;
+
+    if (d.getMonth() !== lastMonth) {
+      lastMonth = d.getMonth();
+      if (dow <= 3) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        monthLabels.push(`<text x="${x}" y="${svgH - 4}" fill="#555" font-size="9">${months[lastMonth]}</text>`);
+      }
+    }
+
+    d.setDate(d.getDate() + 1);
+  }
+
+  // Day labels
+  const dayLabels = ['M','','W','','F','','S'];
+  let dayLabelsSvg = '';
+  for (let i = 0; i < 7; i++) {
+    if (dayLabels[i]) {
+      dayLabelsSvg += `<text x="0" y="${i * step + 10}" fill="#555" font-size="9" font-family="sans-serif">${dayLabels[i]}</text>`;
+    }
+  }
+
+  const container = document.getElementById('heatmapContainer');
+  container.innerHTML = `<svg class="heatmap-svg" width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">${dayLabelsSvg}${rects}${monthLabels.join('')}</svg>`;
+
+  // Auto-scroll to current week
+  const currentDayOfYear = dayOfYear();
+  const currentWeek = Math.floor((currentDayOfYear + startDow) / 7);
+  const scrollTarget = Math.max(0, currentWeek * step - container.clientWidth / 2);
+  container.scrollLeft = scrollTarget;
+}
+
+// ============ SESSION MANAGEMENT ============
+window.toggleSession = function() {
+  if (sessionActive) {
+    stopSession();
+  } else {
+    startSession();
+  }
+};
+
+function startSession() {
+  sessionActive = true;
+  sessionStartDate = getDateStr();
+  sessionStartTime = new Date().toISOString();
+  currentSessionCount = 0;
+
+  const btn = document.getElementById('mainBtn');
+  btn.textContent = 'STOP SESSION';
+  btn.className = 'btn btn-stop';
+
+  startCamera();
+  updateUI();
+}
+
+function stopSession() {
+  if (currentSessionCount > 0) {
+    saveCurrentEntry();
+  }
+  sessionActive = false;
+
+  const btn = document.getElementById('mainBtn');
+  btn.textContent = 'START SESSION';
+  btn.className = 'btn btn-start';
+
+  stopCamera();
+  updateUI();
+}
+
+function saveCurrentEntry() {
+  if (currentSessionCount <= 0) return;
+  const dateStr = sessionStartDate || getDateStr();
+  const session = getOrCreateSession(dateStr);
+  session.entries.push({
+    count: currentSessionCount,
+    startTime: sessionStartTime || new Date().toISOString(),
+    endTime: new Date().toISOString()
+  });
+  saveData();
+}
+
+function incrementCount() {
+  currentSessionCount++;
+  updateUI();
+  // Haptic feedback
+  if (navigator.vibrate) navigator.vibrate(50);
+  // Flash the count
+  const el = document.getElementById('sessionCount');
+  el.style.color = 'var(--accent2)';
+  setTimeout(() => el.style.color = 'white', 200);
+}
+
+window.manualAdd = function(n) {
+  if (!sessionActive) {
+    // Quick add without session
+    const dateStr = getDateStr();
+    const session = getOrCreateSession(dateStr);
+    if (n > 0) {
+      session.entries.push({ count: n, startTime: new Date().toISOString(), endTime: new Date().toISOString() });
+    } else if (n < 0) {
+      // Remove from last entry
+      for (let i = session.entries.length - 1; i >= 0; i--) {
+        if (session.entries[i].count > 0) {
+          session.entries[i].count = Math.max(0, session.entries[i].count + n);
+          if (session.entries[i].count === 0) session.entries.splice(i, 1);
+          break;
+        }
+      }
+    }
+    saveData();
+    updateUI();
+    return;
+  }
+
+  if (n > 0) {
+    incrementCount();
+  } else {
+    currentSessionCount = Math.max(0, currentSessionCount + n);
+    updateUI();
+  }
+};
+
+// Save on page exit
+window.addEventListener('beforeunload', () => {
+  if (sessionActive && currentSessionCount > 0) {
+    saveCurrentEntry();
+    currentSessionCount = 0;
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && sessionActive && currentSessionCount > 0) {
+    saveCurrentEntry();
+    // Don't reset — keep counting if they come back
+    sessionStartTime = new Date().toISOString();
+    const savedCount = currentSessionCount;
+    currentSessionCount = 0;
+    // We already saved, so adjust: the UI still shows session total
+    // Actually let's just checkpoint and continue
+    currentSessionCount = 0;
+    updateUI();
+  }
+});
+
+// ============ CAMERA & POSE DETECTION ============
+let videoEl, canvasEl, canvasCtx;
+let poseLandmarker = null;
+let animFrameId = null;
+let cameraStream = null;
+let useFrontCamera = true;
+let modelLoading = false;
+
+// Squat detection state
+let squatState = 'STANDING'; // STANDING or AT_BOTTOM
+let smoothedAngle = 160;
+let consecutiveFrames = 0;
+const EMA_ALPHA = 0.7;
+let bottomThreshold = 120;
+let standingThreshold = 160;
+let lastFrameTime = 0;
+
+async function loadModel() {
+  if (poseLandmarker || modelLoading) return;
+  modelLoading = true;
+  showCameraStatus('Loading pose model...');
+
+  try {
+    const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs');
+    const { PoseLandmarker, FilesetResolver } = vision;
+
+    const wasmFiles = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    );
+
+    poseLandmarker = await PoseLandmarker.createFromOptions(wasmFiles, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
+        delegate: 'GPU'
+      },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    showCameraStatus('Model ready');
+    modelLoading = false;
+  } catch (e) {
+    console.error('Model load failed:', e);
+    showCameraStatus('Model failed — manual mode', true);
+    modelLoading = false;
+  }
+}
+
+async function startCamera() {
+  videoEl = document.getElementById('video');
+  canvasEl = document.getElementById('overlay');
+  canvasCtx = canvasEl.getContext('2d');
+
+  try {
+    showCameraStatus('Starting camera...');
+    const constraints = {
+      video: {
+        facingMode: useFrontCamera ? 'user' : 'environment',
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    };
+
+    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoEl.srcObject = cameraStream;
+    videoEl.style.display = 'block';
+    canvasEl.style.display = 'block';
+    document.getElementById('cameraPlaceholder').style.display = 'none';
+    document.getElementById('flipBtn').classList.add('visible');
+
+    videoEl.onloadedmetadata = () => {
+      canvasEl.width = videoEl.videoWidth;
+      canvasEl.height = videoEl.videoHeight;
+    };
+
+    await loadModel();
+
+    if (poseLandmarker) {
+      showCameraStatus('Detecting...');
+      lastFrameTime = 0;
+      detectLoop();
+    }
+  } catch (e) {
+    console.error('Camera error:', e);
+    showCameraStatus('Camera denied — use +/- buttons', true);
+    document.getElementById('cameraPlaceholder').style.display = 'flex';
+    document.getElementById('cameraPlaceholder').querySelector('span').textContent = 'Camera access denied';
+  }
+}
+
+function stopCamera() {
+  if (animFrameId) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const vid = document.getElementById('video');
+  const cvs = document.getElementById('overlay');
+  if (vid) vid.style.display = 'none';
+  if (cvs) cvs.style.display = 'none';
+  document.getElementById('cameraPlaceholder').style.display = 'flex';
+  document.getElementById('cameraPlaceholder').querySelector('span').textContent = 'Camera activates when session starts';
+  document.getElementById('flipBtn').classList.remove('visible');
+  document.getElementById('cameraStatus').style.display = 'none';
+
+  // Reset squat state
+  squatState = 'STANDING';
+  smoothedAngle = 160;
+  consecutiveFrames = 0;
+}
+
+window.flipCamera = async function() {
+  useFrontCamera = !useFrontCamera;
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+  }
+  if (animFrameId) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
+  await startCamera();
+};
+
+function detectLoop() {
+  if (!sessionActive || !poseLandmarker || !videoEl || videoEl.readyState < 2) {
+    animFrameId = requestAnimationFrame(detectLoop);
+    return;
+  }
+
+  const now = performance.now();
+  // Adaptive frame skipping: if processing is slow, skip frames
+  if (now - lastFrameTime < 33) { // Cap at ~30fps
+    animFrameId = requestAnimationFrame(detectLoop);
+    return;
+  }
+
+  try {
+    const result = poseLandmarker.detectForVideo(videoEl, now);
+    canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+    if (result.landmarks && result.landmarks.length > 0) {
+      const lm = result.landmarks[0];
+      drawSkeleton(lm);
+      processSquat(lm);
+    }
+  } catch (e) {
+    // Silently continue on detection errors
+  }
+
+  lastFrameTime = now;
+  animFrameId = requestAnimationFrame(detectLoop);
+}
+
+function drawSkeleton(landmarks) {
+  const w = canvasEl.width;
+  const h = canvasEl.height;
+
+  // Connections to draw
+  const connections = [
+    [11,12], [11,13], [13,15], [12,14], [14,16], // arms
+    [11,23], [12,24], [23,24], // torso
+    [23,25], [25,27], [24,26], [26,28], // legs
+    [27,29], [28,30], [29,31], [30,32] // feet
+  ];
+
+  canvasCtx.strokeStyle = 'rgba(79, 195, 247, 0.7)';
+  canvasCtx.lineWidth = 3;
+
+  for (const [a, b] of connections) {
+    if (landmarks[a].visibility > 0.3 && landmarks[b].visibility > 0.3) {
+      canvasCtx.beginPath();
+      canvasCtx.moveTo(landmarks[a].x * w, landmarks[a].y * h);
+      canvasCtx.lineTo(landmarks[b].x * w, landmarks[b].y * h);
+      canvasCtx.stroke();
+    }
+  }
+
+  // Draw key points
+  canvasCtx.fillStyle = 'rgba(129, 199, 132, 0.9)';
+  const keyPoints = [11,12,13,14,15,16,23,24,25,26,27,28];
+  for (const i of keyPoints) {
+    if (landmarks[i].visibility > 0.3) {
+      canvasCtx.beginPath();
+      canvasCtx.arc(landmarks[i].x * w, landmarks[i].y * h, 5, 0, 2 * Math.PI);
+      canvasCtx.fill();
+    }
+  }
+}
+
+function angle(a, b, c) {
+  const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+  let deg = Math.abs(radians * 180 / Math.PI);
+  if (deg > 180) deg = 360 - deg;
+  return deg;
+}
+
+function processSquat(landmarks) {
+  // Indices: hip=23/24, knee=25/26, ankle=27/28
+  const lHip = landmarks[23], rHip = landmarks[24];
+  const lKnee = landmarks[25], rKnee = landmarks[26];
+  const lAnkle = landmarks[27], rAnkle = landmarks[28];
+
+  // Check visibility
+  const minVis = 0.5;
+  const leftVisible = lHip.visibility > minVis && lKnee.visibility > minVis && lAnkle.visibility > minVis;
+  const rightVisible = rHip.visibility > minVis && rKnee.visibility > minVis && rAnkle.visibility > minVis;
+
+  if (!leftVisible && !rightVisible) return;
+
+  let kneeAngle;
+  if (leftVisible && rightVisible) {
+    kneeAngle = (angle(lHip, lKnee, lAnkle) + angle(rHip, rKnee, rAnkle)) / 2;
+  } else if (leftVisible) {
+    kneeAngle = angle(lHip, lKnee, lAnkle);
+  } else {
+    kneeAngle = angle(rHip, rKnee, rAnkle);
+  }
+
+  // Exponential moving average
+  smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * kneeAngle;
+
+  // State machine with debounce (3 consecutive frames)
+  const targetState = smoothedAngle < bottomThreshold ? 'AT_BOTTOM'
+    : smoothedAngle > standingThreshold ? 'STANDING'
+    : squatState; // hysteresis zone
+
+  if (targetState !== squatState) {
+    consecutiveFrames++;
+    if (consecutiveFrames >= 3) {
+      const prevState = squatState;
+      squatState = targetState;
+      consecutiveFrames = 0;
+
+      // Count on AT_BOTTOM → STANDING
+      if (prevState === 'AT_BOTTOM' && squatState === 'STANDING') {
+        incrementCount();
+      }
+    }
+  } else {
+    consecutiveFrames = 0;
+  }
+
+  // Visual indicator on camera status
+  const statusEl = document.getElementById('cameraStatus');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = squatState === 'AT_BOTTOM'
+      ? `⬇ ${Math.round(smoothedAngle)}°`
+      : `⬆ ${Math.round(smoothedAngle)}°`;
+    statusEl.className = 'camera-status';
+  }
+}
+
+function showCameraStatus(msg, isError) {
+  const el = document.getElementById('cameraStatus');
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.className = isError ? 'camera-status error' : 'camera-status';
+}
+
+// ============ SETTINGS ============
+window.toggleSettings = function() {
+  const panel = document.getElementById('settingsPanel');
+  panel.classList.toggle('open');
+};
+
+window.updateSensitivity = function(val) {
+  bottomThreshold = parseInt(val);
+  document.getElementById('sensitivityLabel').textContent = val + '°';
+};
+
+window.exportData = function() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `squats30k_${getDateStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Data exported');
+};
+
+window.importData = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (imported.year && imported.sessions) {
+        data = imported;
+        saveData();
+        updateUI();
+        showToast('Data imported successfully');
+      } else {
+        showToast('Invalid data format');
+      }
+    } catch (err) {
+      showToast('Failed to parse file');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+};
+
+window.resetData = function() {
+  if (confirm('Are you sure? This will delete ALL squat data.')) {
+    if (confirm('Really? This cannot be undone.')) {
+      data = { year: YEAR, goal: GOAL, sessions: [] };
+      saveData();
+      currentSessionCount = 0;
+      if (sessionActive) stopSession();
+      updateUI();
+      showToast('All data reset');
+    }
+  }
+};
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ============ INIT ============
+// Load sensitivity from localStorage
+const savedSens = localStorage.getItem('squats30k_sensitivity');
+if (savedSens) {
+  bottomThreshold = parseInt(savedSens);
+  document.getElementById('sensitivitySlider').value = bottomThreshold;
+  document.getElementById('sensitivityLabel').textContent = bottomThreshold + '°';
+}
+
+// Save sensitivity on change
+document.getElementById('sensitivitySlider').addEventListener('change', () => {
+  localStorage.setItem('squats30k_sensitivity', bottomThreshold);
+});
+
+updateUI();
+</script>
+</body>
+</html>
