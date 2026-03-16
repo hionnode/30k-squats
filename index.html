@@ -360,6 +360,75 @@ header h1 {
 }
 .streak-warning.visible { display: block; }
 
+/* Milestone Celebration Overlay */
+.milestone-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 500;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  cursor: pointer;
+}
+.milestone-overlay.show {
+  display: flex;
+}
+@keyframes milestoneIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.milestone-overlay .milestone-icon {
+  font-size: 4rem;
+  animation: milestoneIn 0.6s ease-out;
+}
+.milestone-overlay .milestone-title {
+  font-size: 1.8rem;
+  font-weight: 900;
+  margin-top: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: milestoneIn 0.6s ease-out 0.1s both;
+}
+.milestone-overlay .milestone-subtitle {
+  font-size: 1rem;
+  color: var(--text-dim);
+  margin-top: 8px;
+  animation: milestoneIn 0.6s ease-out 0.2s both;
+}
+.milestone-overlay .milestone-chapter {
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-style: italic;
+  margin-top: 12px;
+  animation: milestoneIn 0.6s ease-out 0.3s both;
+}
+.milestone-overlay .dismiss-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 24px;
+  animation: milestoneIn 0.6s ease-out 0.4s both;
+}
+
+/* Progress bar milestone ticks */
+.progress-bar-bg {
+  position: relative;
+}
+.milestone-tick {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: rgba(255,255,255,0.2);
+  z-index: 1;
+}
+
 /* Toast notification */
 .toast {
   position: fixed;
@@ -478,11 +547,45 @@ header h1 {
 
 <div class="toast" id="toast"></div>
 
+<!-- Milestone Celebration Overlay -->
+<div class="milestone-overlay" id="milestoneOverlay" onclick="dismissMilestone()">
+  <div class="milestone-icon" id="milestoneIcon"></div>
+  <div class="milestone-title" id="milestoneTitle"></div>
+  <div class="milestone-subtitle" id="milestoneSubtitle"></div>
+  <div class="milestone-chapter" id="milestoneChapter"></div>
+  <div class="dismiss-hint">Tap to dismiss</div>
+</div>
+
 <script type="module">
 // ============ DATA LAYER ============
 const STORAGE_KEY = 'squats30k';
 const YEAR = 2026;
 const GOAL = 30000;
+
+const MILESTONES = [1000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 30000];
+const MILESTONE_DATA = {
+  1000:  { icon: '🏅', title: '1K Club!', chapter: 'Chapter 1: The First Step' },
+  2500:  { icon: '⚡', title: '2,500 Strong!', chapter: 'Chapter 2: Building Momentum' },
+  5000:  { icon: '🔥', title: '5K Crusher!', chapter: 'Chapter 3: The Grind' },
+  7500:  { icon: '💪', title: '7,500 — Unstoppable!', chapter: 'Chapter 4: Iron Legs' },
+  10000: { icon: '🏆', title: '10K LEGEND!', chapter: 'Chapter 5: The Halfway Hero' },
+  15000: { icon: '⭐', title: '15K — Over Halfway!', chapter: 'Chapter 6: Downhill From Here' },
+  20000: { icon: '🚀', title: '20K — The Final Push!', chapter: 'Chapter 7: The Home Stretch' },
+  25000: { icon: '👑', title: '25K — Almost There!', chapter: 'Chapter 8: The Final Chapter' },
+  30000: { icon: '🎆', title: '30K — YOU DID IT!', chapter: 'The End: Legendary' },
+};
+
+const MILESTONE_MESSAGES = {
+  1000:  ['Welcome to the 1K club!', 'Your first thousand — many more to come!', 'That\'s more squats than most people do in a year!'],
+  2500:  ['Quarter way to 10K!', 'Legs of steel in the making!', '2,500 squats — your knees thank you!'],
+  5000:  ['5,000 squats. Let that sink in.', 'You could squat your way across a football field!', 'The grind is real. So are your gains.'],
+  7500:  ['Three quarters to 10K!', 'Your dedication is showing!', '7,500 — most people quit at 100!'],
+  10000: ['FIVE DIGITS! You\'re in rare company.', '10,000 squats — that\'s elite territory!', 'Halfway there. No turning back now.'],
+  15000: ['Past the halfway mark!', 'More behind you than ahead!', '15K — the momentum is unstoppable!'],
+  20000: ['20K! The final 10,000 starts now.', 'Two thirds done. Legend status loading...', 'If each squat was a step, you\'d have walked 2 miles!'],
+  25000: ['5,000 to go. You can taste it!', 'The finish line is in sight!', '25K — you\'re in the final chapter!'],
+  30000: ['YOU DID IT! 30,000 SQUATS!', 'GOAL COMPLETE! Absolute legend!', 'From zero to thirty thousand. Incredible.'],
+};
 
 function loadData() {
   try {
@@ -493,11 +596,12 @@ function loadData() {
         if (!d.currentStreak) d.currentStreak = 0;
         if (!d.bestStreak) d.bestStreak = 0;
         if (!d.lastActiveDate) d.lastActiveDate = null;
+        if (!d.unlockedMilestones) d.unlockedMilestones = [];
         return d;
       }
     }
   } catch (e) { console.error('Failed to load data', e); }
-  return { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null };
+  return { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [] };
 }
 
 function saveData() {
@@ -577,6 +681,55 @@ function daysRemaining() {
   const end = new Date(YEAR, 11, 31);
   const diff = end - now;
   return Math.max(1, Math.ceil(diff / 86400000));
+}
+
+// ============ MILESTONE CELEBRATIONS ============
+function checkMilestones(prevTotal) {
+  const total = totalSquats();
+  for (const m of MILESTONES) {
+    if (prevTotal < m && total >= m && !data.unlockedMilestones.includes(m)) {
+      data.unlockedMilestones.push(m);
+      saveData();
+      showMilestoneCelebration(m);
+      return;
+    }
+  }
+}
+
+let milestoneTimeout = null;
+function showMilestoneCelebration(milestone) {
+  const md = MILESTONE_DATA[milestone];
+  const messages = MILESTONE_MESSAGES[milestone];
+  const message = messages[Math.floor(Math.random() * messages.length)];
+
+  document.getElementById('milestoneIcon').textContent = md.icon;
+  document.getElementById('milestoneTitle').textContent = md.title;
+  document.getElementById('milestoneSubtitle').textContent = message;
+  document.getElementById('milestoneChapter').textContent = md.chapter;
+
+  const overlay = document.getElementById('milestoneOverlay');
+  overlay.classList.add('show');
+
+  milestoneTimeout = setTimeout(() => dismissMilestone(), 5000);
+}
+
+window.dismissMilestone = function() {
+  document.getElementById('milestoneOverlay').classList.remove('show');
+  if (milestoneTimeout) { clearTimeout(milestoneTimeout); milestoneTimeout = null; }
+};
+
+function renderMilestoneTicks() {
+  const bg = document.querySelector('.progress-bar-bg');
+  bg.querySelectorAll('.milestone-tick').forEach(t => t.remove());
+  for (const m of MILESTONES) {
+    if (m >= GOAL) continue;
+    const pct = (m / GOAL) * 100;
+    const tick = document.createElement('div');
+    tick.className = 'milestone-tick';
+    tick.style.left = pct + '%';
+    tick.title = m.toLocaleString();
+    bg.appendChild(tick);
+  }
 }
 
 // ============ STREAK TRACKING ============
@@ -701,6 +854,7 @@ function updateUI() {
   }
 
   updateStreakUI();
+  renderMilestoneTicks();
   renderHeatmap();
 }
 
@@ -829,6 +983,7 @@ function stopSession() {
 
 function saveCurrentEntry() {
   if (currentSessionCount <= 0) return;
+  const prevTotal = totalSquats();
   const dateStr = sessionStartDate || getDateStr();
   const session = getOrCreateSession(dateStr);
   session.entries.push({
@@ -838,6 +993,7 @@ function saveCurrentEntry() {
   });
   computeStreak();
   saveData();
+  checkMilestones(prevTotal);
 }
 
 function incrementCount() {
@@ -854,6 +1010,7 @@ function incrementCount() {
 window.manualAdd = function(n) {
   if (!sessionActive) {
     // Quick add without session
+    const prevTotal = totalSquats();
     const dateStr = getDateStr();
     const session = getOrCreateSession(dateStr);
     if (n > 0) {
@@ -870,6 +1027,7 @@ window.manualAdd = function(n) {
     }
     if (n > 0) { computeStreak(); }
     saveData();
+    if (n > 0) { checkMilestones(prevTotal); }
     updateUI();
     return;
   }
@@ -1217,7 +1375,7 @@ window.importData = function(event) {
 window.resetData = function() {
   if (confirm('Are you sure? This will delete ALL squat data.')) {
     if (confirm('Really? This cannot be undone.')) {
-      data = { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null };
+      data = { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [] };
       saveData();
       currentSessionCount = 0;
       if (sessionActive) stopSession();
