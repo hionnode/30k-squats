@@ -27,7 +27,7 @@ Everything lives in `index.html`. No build step, no dependencies to install.
 npx wrangler pages deploy . --project-name=30k-squats --branch=main
 ```
 
-Live URL: https://30k-squats.pages.dev
+Live URL: https://30k-squats.xyz
 
 ## Workflow
 
