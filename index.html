@@ -83,13 +83,13 @@ header h1 {
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 12px;
+  gap: 16px;
   color: var(--text-dim);
-  font-size: 0.9rem;
+  font-size: 1.3rem;
 }
 .camera-placeholder svg {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   opacity: 0.4;
 }
 .camera-status {
@@ -107,14 +107,14 @@ header h1 {
 .setup-tips {
   list-style: none;
   padding: 0;
-  margin: 8px 16px 0;
+  margin: 12px 24px 0;
   color: var(--text-dim);
-  font-size: 0.75rem;
+  font-size: 1.15rem;
   opacity: 0.8;
   text-align: left;
 }
 .setup-tips li::before { content: "· "; }
-.setup-tips li { margin: 4px 0; }
+.setup-tips li { margin: 8px 0; }
 .flip-btn {
   position: absolute;
   top: 8px;
@@ -1062,8 +1062,8 @@ function updateUI() {
     deltaEl.textContent = `${delta.toLocaleString()} ahead of schedule`;
     deltaEl.style.color = 'var(--accent2)';
   } else {
-    const deficit = Math.abs(delta);
-    deltaEl.textContent = `Do ${(remainingToday + Math.ceil(deficit / 7)).toLocaleString()} today to get back on track`;
+    const projected = Math.round((total / dayOfYear()) * 365);
+    deltaEl.textContent = `On pace for ${projected.toLocaleString()} this year`;
     deltaEl.style.color = 'var(--warning)';
   }
 

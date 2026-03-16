@@ -29,6 +29,13 @@ npx wrangler pages deploy . --project-name=30k-squats --branch=main
 
 Live URL: https://30k-squats.pages.dev
 
+## Workflow
+
+After finishing code changes, always commit and deploy without asking:
+
+1. Commit the changes (follow commit style below)
+2. Deploy with the wrangler command above
+
 ## Commit Style
 
 ```
