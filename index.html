@@ -2259,23 +2259,41 @@ function buildSyncPayload() {
 }
 
 function applySyncData(serverData) {
+  if (!serverData || typeof serverData !== 'object' || Array.isArray(serverData)) return;
+  const dangerous = ['__proto__', 'constructor', 'prototype'];
+
   for (const [name, cfg] of Object.entries(EXERCISES)) {
-    if (serverData[name] && serverData[name].sessions) {
-      const d = serverData[name];
-      if (!d.currentStreak) d.currentStreak = 0;
-      if (!d.bestStreak) d.bestStreak = 0;
-      if (!d.lastActiveDate) d.lastActiveDate = null;
-      if (!d.unlockedMilestones) d.unlockedMilestones = [];
-      if (!d.bestSession) d.bestSession = 0;
-      if (!d.bestDay) d.bestDay = 0;
-      if (!d.bestWeek) d.bestWeek = 0;
-      dataStore[name] = d;
-      saveDataForKey(cfg.key, d);
-    }
+    if (!serverData[name] || !serverData[name].sessions) continue;
+    const d = serverData[name];
+    if (typeof d !== 'object' || Array.isArray(d)) continue;
+    // Build clean object with only expected fields
+    const clean = {
+      sessions: Array.isArray(d.sessions) ? d.sessions.filter(s =>
+        s && typeof s === 'object' && !dangerous.includes(s) &&
+        typeof s.date === 'string' && Array.isArray(s.entries)
+      ).map(s => ({
+        date: s.date,
+        entries: s.entries.filter(e =>
+          e && typeof e === 'object' && typeof e.count === 'number' &&
+          typeof e.startTime === 'string' && typeof e.endTime === 'string'
+        ).map(e => ({ count: e.count, startTime: e.startTime, endTime: e.endTime }))
+      })) : [],
+      year: typeof d.year === 'number' ? d.year : YEAR,
+      currentStreak: typeof d.currentStreak === 'number' ? d.currentStreak : 0,
+      bestStreak: typeof d.bestStreak === 'number' ? d.bestStreak : 0,
+      lastActiveDate: typeof d.lastActiveDate === 'string' ? d.lastActiveDate : null,
+      unlockedMilestones: Array.isArray(d.unlockedMilestones) ? d.unlockedMilestones.filter(m => typeof m === 'number') : [],
+      bestSession: typeof d.bestSession === 'number' ? d.bestSession : 0,
+      bestDay: typeof d.bestDay === 'number' ? d.bestDay : 0,
+      bestWeek: typeof d.bestWeek === 'number' ? d.bestWeek : 0,
+    };
+    dataStore[name] = clean;
+    saveDataForKey(cfg.key, clean);
   }
-  if (serverData._goals) {
+  if (serverData._goals && typeof serverData._goals === 'object' && !Array.isArray(serverData._goals)) {
     for (const [name, val] of Object.entries(serverData._goals)) {
-      if (EXERCISES[name]) setGoal(name, val);
+      if (dangerous.includes(name)) continue;
+      if (EXERCISES[name] && typeof val === 'number' && isFinite(val)) setGoal(name, val);
     }
   }
   computeStreak();

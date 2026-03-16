@@ -28,7 +28,18 @@ export async function onRequest(context) {
 
   try {
     const payload = await verifyJWT(auth.slice(7), context.env.JWT_SECRET);
-    context.data.userId = payload.sub;
+    const userId = payload.sub;
+
+    // Verify user exists in DB
+    const user = await context.env.DB.prepare(
+      'SELECT id FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (!user) {
+      return json({ error: 'unauthorized' }, 401);
+    }
+
+    context.data.userId = userId;
   } catch (e) {
     return json({ error: 'unauthorized' }, 401);
   }
