@@ -1,0 +1,8 @@
+name = "30k-squats"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "30k-squats-sync"
+database_id = "d3bc5c5e-9afd-4427-99ca-a03fbe345e15"

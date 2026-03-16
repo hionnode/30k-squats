@@ -724,11 +724,47 @@ header h1 {
       <label>Burpees Goal (min 10,000)</label>
       <input type="number" id="goalBurpees" min="10000" step="1000" value="10000" onchange="updateGoal('burpees', this)">
     </div>
+    <div class="setting-row" id="syncSection">
+      <label>Cloud Sync</label>
+      <div id="syncNotSetup">
+        <button class="btn-settings" onclick="enableCloudSync()">Enable Cloud Sync</button>
+        <button class="btn-settings" style="margin-top:4px" onclick="showLinkDevice()">Link Existing Device</button>
+      </div>
+      <div id="syncEnabled" style="display:none">
+        <div style="text-align:center;margin-bottom:8px;font-size:0.85rem;color:var(--text-dim)">
+          Your code: <strong id="syncCodeDisplay" style="color:var(--accent);letter-spacing:2px;font-size:1.1rem"></strong>
+        </div>
+        <button class="btn-settings" onclick="syncNow()">Sync Now</button>
+        <button class="btn-settings btn-reset" style="margin-top:4px" onclick="disableCloudSync()">Disable Sync</button>
+      </div>
+    </div>
     <button class="btn-settings btn-export" onclick="exportData()">Export Data (JSON)</button>
     <button class="btn-settings btn-import" onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
     <button class="btn-settings btn-reset" onclick="resetData()">Reset All Data</button>
     <button class="btn-settings btn-close-settings" onclick="toggleSettings()">Close</button>
+  </div>
+</div>
+
+<!-- Link Device Modal -->
+<div class="settings-panel" id="linkDeviceModal">
+  <div class="settings-content" style="max-width:340px">
+    <h2>Link Device</h2>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:12px">Enter the 8-character code from your other device.</p>
+    <input type="text" id="linkCodeInput" maxlength="8" placeholder="e.g. ABCD1234" autocapitalize="characters" spellcheck="false" style="width:100%;padding:12px;background:var(--surface2);border:1px solid #333;border-radius:8px;color:var(--text);font-size:1.1rem;text-align:center;letter-spacing:3px;font-family:monospace;margin-bottom:12px">
+    <button class="btn-settings" onclick="submitLinkCode()">Link</button>
+    <button class="btn-settings btn-close-settings" style="margin-top:4px" onclick="closeLinkModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- Sync Code Display Modal -->
+<div class="settings-panel" id="syncCodeModal">
+  <div class="settings-content" style="max-width:340px;text-align:center">
+    <h2>Cloud Sync Enabled</h2>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:12px">Use this code on another device to link your data:</p>
+    <div id="syncCodeModalDisplay" style="font-size:1.8rem;font-weight:800;letter-spacing:4px;color:var(--accent);margin:16px 0;font-family:monospace"></div>
+    <p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:16px">Save this code! You can also find it in Settings.</p>
+    <button class="btn-settings btn-close-settings" onclick="closeSyncCodeModal()">Got it</button>
   </div>
 </div>
 
@@ -1375,7 +1411,8 @@ function startSession() {
 }
 
 function stopSession() {
-  if (currentSessionCount > 0) {
+  const hadReps = currentSessionCount > 0;
+  if (hadReps) {
     saveCurrentEntry();
   }
   sessionActive = false;
@@ -1388,6 +1425,9 @@ function stopSession() {
     stopCamera();
   }
   updateUI();
+  if (hadReps && isSyncEnabled()) {
+    showSyncNudge();
+  }
 }
 
 function saveCurrentEntry() {
@@ -2172,6 +2212,251 @@ function showToast(msg, isRecord) {
   setTimeout(() => { toast.classList.remove('show'); }, 2500);
 }
 
+// ============ CLOUD SYNC ============
+const SYNC_API = '/api';
+
+function getSyncToken() { return localStorage.getItem('sync_token'); }
+function getSyncVersion() { return parseInt(localStorage.getItem('sync_version') || '0'); }
+function getSyncSecret() { return localStorage.getItem('sync_secret'); }
+function isSyncEnabled() { return localStorage.getItem('sync_enabled') === 'true'; }
+
+function setSyncState(token, secret, version) {
+  localStorage.setItem('sync_token', token);
+  if (secret) localStorage.setItem('sync_secret', secret);
+  localStorage.setItem('sync_version', String(version || 0));
+  localStorage.setItem('sync_enabled', 'true');
+  updateSyncUI();
+}
+
+function clearSyncState() {
+  localStorage.removeItem('sync_token');
+  localStorage.removeItem('sync_secret');
+  localStorage.removeItem('sync_version');
+  localStorage.removeItem('sync_enabled');
+  updateSyncUI();
+}
+
+function updateSyncUI() {
+  const enabled = isSyncEnabled();
+  const notSetup = document.getElementById('syncNotSetup');
+  const enabledDiv = document.getElementById('syncEnabled');
+  const codeDisplay = document.getElementById('syncCodeDisplay');
+  if (notSetup) notSetup.style.display = enabled ? 'none' : 'block';
+  if (enabledDiv) enabledDiv.style.display = enabled ? 'block' : 'none';
+  if (codeDisplay && enabled) codeDisplay.textContent = getSyncSecret() || '';
+}
+
+function buildSyncPayload() {
+  const payload = {};
+  for (const [name, cfg] of Object.entries(EXERCISES)) {
+    payload[name] = dataStore[name];
+  }
+  payload._goals = {};
+  for (const name of Object.keys(EXERCISES)) {
+    payload._goals[name] = getGoal(name);
+  }
+  return payload;
+}
+
+function applySyncData(serverData) {
+  for (const [name, cfg] of Object.entries(EXERCISES)) {
+    if (serverData[name] && serverData[name].sessions) {
+      const d = serverData[name];
+      if (!d.currentStreak) d.currentStreak = 0;
+      if (!d.bestStreak) d.bestStreak = 0;
+      if (!d.lastActiveDate) d.lastActiveDate = null;
+      if (!d.unlockedMilestones) d.unlockedMilestones = [];
+      if (!d.bestSession) d.bestSession = 0;
+      if (!d.bestDay) d.bestDay = 0;
+      if (!d.bestWeek) d.bestWeek = 0;
+      dataStore[name] = d;
+      saveDataForKey(cfg.key, d);
+    }
+  }
+  if (serverData._goals) {
+    for (const [name, val] of Object.entries(serverData._goals)) {
+      if (EXERCISES[name]) setGoal(name, val);
+    }
+  }
+  computeStreak();
+  updatePersonalBests(false);
+  updateUI();
+}
+
+function mergeData(local, server) {
+  const merged = {};
+  for (const [name, cfg] of Object.entries(EXERCISES)) {
+    const l = local[name];
+    const s = server[name];
+    if (!s || !s.sessions) { merged[name] = l; continue; }
+    if (!l || !l.sessions) { merged[name] = s; continue; }
+
+    // Merge sessions by date, entries by startTime
+    const sessionMap = {};
+    for (const sess of l.sessions) {
+      sessionMap[sess.date] = { ...sess, entries: [...sess.entries] };
+    }
+    for (const sess of s.sessions) {
+      if (!sessionMap[sess.date]) {
+        sessionMap[sess.date] = { ...sess, entries: [...sess.entries] };
+      } else {
+        const existing = sessionMap[sess.date];
+        const startTimes = new Set(existing.entries.map(e => e.startTime));
+        for (const entry of sess.entries) {
+          if (!startTimes.has(entry.startTime)) {
+            existing.entries.push(entry);
+          }
+        }
+      }
+    }
+    const sessions = Object.values(sessionMap).sort((a, b) => a.date.localeCompare(b.date));
+    merged[name] = { ...l, sessions };
+  }
+
+  // Goals: take max
+  merged._goals = {};
+  for (const name of Object.keys(EXERCISES)) {
+    const lg = (local._goals && local._goals[name]) || EXERCISES[name].defaultGoal;
+    const sg = (server._goals && server._goals[name]) || EXERCISES[name].defaultGoal;
+    merged._goals[name] = Math.max(lg, sg);
+  }
+  return merged;
+}
+
+async function syncFetch(path, options = {}) {
+  const token = getSyncToken();
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${SYNC_API}${path}`, { ...options, headers });
+  return res;
+}
+
+window.enableCloudSync = async function() {
+  try {
+    const res = await syncFetch('/register', { method: 'POST' });
+    if (!res.ok) { showToast('Failed to enable sync'); return; }
+    const { secret, token } = await res.json();
+    setSyncState(token, secret, 0);
+    document.getElementById('syncCodeModalDisplay').textContent = secret;
+    document.getElementById('syncCodeModal').classList.add('open');
+    await syncNow();
+  } catch (e) {
+    showToast('Sync error: ' + e.message);
+  }
+};
+
+window.showLinkDevice = function() {
+  document.getElementById('linkCodeInput').value = '';
+  document.getElementById('linkDeviceModal').classList.add('open');
+};
+
+function closeLinkModal() {
+  document.getElementById('linkDeviceModal').classList.remove('open');
+}
+window.closeLinkModal = closeLinkModal;
+
+function closeSyncCodeModal() {
+  document.getElementById('syncCodeModal').classList.remove('open');
+}
+window.closeSyncCodeModal = closeSyncCodeModal;
+
+window.submitLinkCode = async function() {
+  const code = document.getElementById('linkCodeInput').value.trim().toUpperCase();
+  if (code.length !== 8) { showToast('Code must be 8 characters'); return; }
+  try {
+    const res = await syncFetch('/link', {
+      method: 'POST',
+      body: JSON.stringify({ secret: code }),
+    });
+    if (res.status === 429) { showToast('Too many attempts, try later'); return; }
+    if (res.status === 404) { showToast('Invalid code'); return; }
+    if (!res.ok) { showToast('Link failed'); return; }
+    const { token } = await res.json();
+    setSyncState(token, code, 0);
+    closeLinkModal();
+
+    // Pull server data and merge with local
+    const pullRes = await syncFetch('/sync');
+    if (pullRes.ok) {
+      const { data: serverData, version } = await pullRes.json();
+      if (serverData) {
+        const local = buildSyncPayload();
+        const merged = mergeData(local, serverData);
+        applySyncData(merged);
+        // Push merged data back
+        const pushRes = await syncFetch('/sync', {
+          method: 'PUT',
+          body: JSON.stringify({ data: merged, baseVersion: version }),
+        });
+        if (pushRes.ok) {
+          const pushResult = await pushRes.json();
+          if (pushResult.ok) localStorage.setItem('sync_version', String(pushResult.version));
+        }
+      }
+      if (!serverData) {
+        localStorage.setItem('sync_version', String(version));
+        await syncNow();
+      }
+    }
+    showToast('Device linked');
+  } catch (e) {
+    showToast('Link error: ' + e.message);
+  }
+};
+
+window.syncNow = syncNow;
+async function syncNow() {
+  if (!isSyncEnabled()) return;
+  try {
+    const local = buildSyncPayload();
+    const baseVersion = getSyncVersion();
+    const res = await syncFetch('/sync', {
+      method: 'PUT',
+      body: JSON.stringify({ data: local, baseVersion }),
+    });
+    if (res.status === 401) { showToast('Sync auth expired — re-link device'); clearSyncState(); return; }
+    if (!res.ok) { showToast('Sync failed'); return; }
+    const result = await res.json();
+    if (result.ok) {
+      localStorage.setItem('sync_version', String(result.version));
+      showToast('Synced');
+    } else if (result.conflict) {
+      // Merge and retry
+      const merged = mergeData(local, result.serverData);
+      applySyncData(merged);
+      const retryRes = await syncFetch('/sync', {
+        method: 'PUT',
+        body: JSON.stringify({ data: merged, baseVersion: result.serverVersion }),
+      });
+      if (retryRes.ok) {
+        const retryResult = await retryRes.json();
+        if (retryResult.ok) {
+          localStorage.setItem('sync_version', String(retryResult.version));
+          showToast('Synced (merged)');
+        } else {
+          showToast('Sync conflict — try again');
+        }
+      }
+    }
+  } catch (e) {
+    showToast('Sync error: ' + e.message);
+  }
+}
+
+window.disableCloudSync = function() {
+  if (confirm('Disable cloud sync? Your data stays on the server but won\'t sync anymore.')) {
+    clearSyncState();
+    showToast('Sync disabled');
+  }
+};
+
+function showSyncNudge() {
+  const toast = document.getElementById('toast');
+  toast.innerHTML = '<span onclick="syncNow()" style="cursor:pointer">Sync? <u>Tap here</u></span>';
+  toast.className = 'toast show';
+  setTimeout(() => { toast.classList.remove('show'); toast.innerHTML = ''; }, 5000);
+}
+
 // ============ INIT ============
 // Load sensitivity for initial exercise
 loadSensitivity();
@@ -2187,6 +2472,7 @@ computeStreak();
 updatePersonalBests(false);
 saveData();
 updateUI();
+updateSyncUI();
 
 // Re-check streak warning every minute
 setInterval(() => updateStreakUI(), 60000);
