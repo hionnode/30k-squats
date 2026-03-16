@@ -53,6 +53,36 @@ header h1 {
   background-clip: text;
 }
 
+/* Exercise Tabs */
+.exercise-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 4px;
+  padding: 4px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.exercise-tabs .tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+.exercise-tabs .tab.active {
+  background: var(--accent);
+  color: #000;
+}
+
 /* Camera Section */
 .camera-section {
   position: relative;
@@ -316,6 +346,16 @@ header h1 {
   width: 100%;
   accent-color: var(--accent);
 }
+.settings-content input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--surface2);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
 .settings-content .btn-settings {
   width: 100%;
   padding: 12px;
@@ -561,17 +601,24 @@ header h1 {
 
 <div class="container">
   <header>
-    <h1>30K SQUATS 2026</h1>
+    <h1 id="headerTitle">30K SQUATS 2026</h1>
     <div class="tagline" id="tagline"></div>
   </header>
+
+  <div class="exercise-tabs" id="exerciseTabs">
+    <button class="tab active" data-exercise="squats" onclick="switchExercise('squats')">Squats</button>
+    <button class="tab" data-exercise="pushups" onclick="switchExercise('pushups')">Pushups</button>
+    <button class="tab" data-exercise="pullups" onclick="switchExercise('pullups')">Pullups</button>
+    <button class="tab" data-exercise="burpees" onclick="switchExercise('burpees')">Burpees</button>
+  </div>
 
   <div class="camera-section" id="cameraSection">
     <div class="camera-placeholder" id="cameraPlaceholder">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9A2.25 2.25 0 004.5 18.75z"/>
       </svg>
-      <span>Camera activates when session starts</span>
-      <ul class="setup-tips">
+      <span id="cameraPlaceholderText">Camera activates when session starts</span>
+      <ul class="setup-tips" id="setupTips">
         <li>Place phone on a stable surface, angled to see your full body</li>
         <li>Stand 6–8 feet away</li>
         <li>Hips, knees, and feet must be visible</li>
@@ -656,10 +703,26 @@ header h1 {
 <div class="settings-panel" id="settingsPanel">
   <div class="settings-content">
     <h2>Settings</h2>
-    <div class="setting-row">
-      <label>Squat Depth Sensitivity</label>
+    <div class="setting-row" id="sensitivityRow">
+      <label id="sensitivityRowLabel">Squat Depth Sensitivity</label>
       <input type="range" id="sensitivitySlider" min="100" max="140" value="120" oninput="updateSensitivity(this.value)">
       <div class="sensitivity-value" id="sensitivityLabel">120°</div>
+    </div>
+    <div class="setting-row">
+      <label>Squats Goal (min 30,000)</label>
+      <input type="number" id="goalSquats" min="30000" step="1000" value="30000" onchange="updateGoal('squats', this)">
+    </div>
+    <div class="setting-row">
+      <label>Pushups Goal (min 20,000)</label>
+      <input type="number" id="goalPushups" min="20000" step="1000" value="20000" onchange="updateGoal('pushups', this)">
+    </div>
+    <div class="setting-row">
+      <label>Pullups Goal (min 10,000)</label>
+      <input type="number" id="goalPullups" min="10000" step="1000" value="10000" onchange="updateGoal('pullups', this)">
+    </div>
+    <div class="setting-row">
+      <label>Burpees Goal (min 10,000)</label>
+      <input type="number" id="goalBurpees" min="10000" step="1000" value="10000" onchange="updateGoal('burpees', this)">
     </div>
     <button class="btn-settings btn-export" onclick="exportData()">Export Data (JSON)</button>
     <button class="btn-settings btn-import" onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
@@ -688,39 +751,78 @@ header h1 {
 </div>
 
 <script type="module">
-// ============ DATA LAYER ============
-const STORAGE_KEY = 'squats30k';
+// ============ EXERCISE CONFIG ============
+const EXERCISES = {
+  squats:  { key: 'squats30k',  label: 'Squats',  minGoal: 30000, defaultGoal: 30000, color: '#4fc3f7', color2: '#81c784', hasCamera: true },
+  pushups: { key: 'pushups20k', label: 'Pushups', minGoal: 20000, defaultGoal: 20000, color: '#ff8a65', color2: '#ffb74d', hasCamera: true },
+  pullups: { key: 'pullups10k', label: 'Pullups', minGoal: 10000, defaultGoal: 10000, color: '#ba68c8', color2: '#ce93d8', hasCamera: true },
+  burpees: { key: 'burpees10k', label: 'Burpees', minGoal: 10000, defaultGoal: 10000, color: '#ef5350', color2: '#e57373', hasCamera: false },
+};
+let activeExercise = 'squats';
+
 const YEAR = 2026;
-const GOAL = 30000;
 
-const MILESTONES = [1000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 30000];
-const MILESTONE_DATA = {
-  1000:  { icon: '🏅', title: '1K Club!', chapter: 'Chapter 1: The First Step' },
-  2500:  { icon: '⚡', title: '2,500 Strong!', chapter: 'Chapter 2: Building Momentum' },
-  5000:  { icon: '🔥', title: '5K Crusher!', chapter: 'Chapter 3: The Grind' },
-  7500:  { icon: '💪', title: '7,500 — Unstoppable!', chapter: 'Chapter 4: Iron Legs' },
-  10000: { icon: '🏆', title: '10K LEGEND!', chapter: 'Chapter 5: The Halfway Hero' },
-  15000: { icon: '⭐', title: '15K — Over Halfway!', chapter: 'Chapter 6: Downhill From Here' },
-  20000: { icon: '🚀', title: '20K — The Final Push!', chapter: 'Chapter 7: The Home Stretch' },
-  25000: { icon: '👑', title: '25K — Almost There!', chapter: 'Chapter 8: The Final Chapter' },
-  30000: { icon: '🎆', title: '30K — YOU DID IT!', chapter: 'The End: Legendary' },
-};
+// ============ DYNAMIC MILESTONES ============
+const MILESTONE_PCTS = [0.033, 0.083, 0.167, 0.25, 0.333, 0.5, 0.667, 0.833, 1.0];
+const CHAPTER_DATA = [
+  { icon: '🏅', chapterTitle: 'Chapter 1: The First Step' },
+  { icon: '⚡', chapterTitle: 'Chapter 2: Building Momentum' },
+  { icon: '🔥', chapterTitle: 'Chapter 3: The Grind' },
+  { icon: '💪', chapterTitle: 'Chapter 4: Unstoppable' },
+  { icon: '🏆', chapterTitle: 'Chapter 5: The Halfway Hero' },
+  { icon: '⭐', chapterTitle: 'Chapter 6: Downhill From Here' },
+  { icon: '🚀', chapterTitle: 'Chapter 7: The Home Stretch' },
+  { icon: '👑', chapterTitle: 'Chapter 8: The Final Chapter' },
+  { icon: '🎆', chapterTitle: 'The End: Legendary' },
+];
 
-const MILESTONE_MESSAGES = {
-  1000:  ['Welcome to the 1K club!', 'Your first thousand — many more to come!', 'That\'s more squats than most people do in a year!'],
-  2500:  ['Quarter way to 10K!', 'Legs of steel in the making!', '2,500 squats — your knees thank you!'],
-  5000:  ['5,000 squats. Let that sink in.', 'You could squat your way across a football field!', 'The grind is real. So are your gains.'],
-  7500:  ['Three quarters to 10K!', 'Your dedication is showing!', '7,500 — most people quit at 100!'],
-  10000: ['FIVE DIGITS! You\'re in rare company.', '10,000 squats — that\'s elite territory!', 'Halfway there. No turning back now.'],
-  15000: ['Past the halfway mark!', 'More behind you than ahead!', '15K — the momentum is unstoppable!'],
-  20000: ['20K! The final 10,000 starts now.', 'Two thirds done. Legend status loading...', 'If each squat was a step, you\'d have walked 2 miles!'],
-  25000: ['5,000 to go. You can taste it!', 'The finish line is in sight!', '25K — you\'re in the final chapter!'],
-  30000: ['YOU DID IT! 30,000 SQUATS!', 'GOAL COMPLETE! Absolute legend!', 'From zero to thirty thousand. Incredible.'],
-};
+function getMilestones(goal) {
+  return MILESTONE_PCTS.map(p => Math.round(p * goal));
+}
 
-function loadData() {
+function getMilestoneData(goal, label) {
+  const milestones = getMilestones(goal);
+  const data = {};
+  milestones.forEach((m, i) => {
+    const fmt = m.toLocaleString();
+    const isLast = i === milestones.length - 1;
+    data[m] = {
+      icon: CHAPTER_DATA[i].icon,
+      title: isLast ? `${fmt} — YOU DID IT!` : `${fmt} ${label}!`,
+      chapter: CHAPTER_DATA[i].chapterTitle,
+    };
+  });
+  return data;
+}
+
+function getMilestoneMessages(goal, label) {
+  const milestones = getMilestones(goal);
+  const msgs = {};
+  milestones.forEach((m, i) => {
+    const fmt = m.toLocaleString();
+    const isLast = i === milestones.length - 1;
+    if (isLast) {
+      msgs[m] = [`YOU DID IT! ${fmt} ${label.toUpperCase()}!`, 'GOAL COMPLETE! Absolute legend!', `From zero to ${fmt}. Incredible.`];
+    } else if (i === 0) {
+      msgs[m] = [`Welcome to the ${fmt} club!`, `Your first ${fmt} — many more to come!`, `That's more ${label.toLowerCase()} than most people do in a year!`];
+    } else {
+      const pctStr = Math.round(MILESTONE_PCTS[i] * 100) + '%';
+      msgs[m] = [`${fmt} ${label.toLowerCase()} done!`, `${pctStr} of your goal — keep going!`, `${fmt} — your dedication is showing!`];
+    }
+  });
+  return msgs;
+}
+
+// ============ DATA LAYER ============
+const dataStore = {};
+
+function freshData(goal) {
+  return { year: YEAR, goal: goal, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [], bestSession: 0, bestDay: 0, bestWeek: 0 };
+}
+
+function loadDataForKey(storageKey, defaultGoal) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       const d = JSON.parse(raw);
       if (d.year === YEAR) {
@@ -734,24 +836,57 @@ function loadData() {
         return d;
       }
     }
-  } catch (e) { console.error('Failed to load data', e); }
-  return { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [], bestSession: 0, bestDay: 0, bestWeek: 0 };
+  } catch (e) { console.error('Failed to load data for ' + storageKey, e); }
+  return freshData(defaultGoal);
 }
 
-function saveData() {
+function saveDataForKey(storageKey, d) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey, JSON.stringify(d));
   } catch (e) { console.error('Failed to save', e); }
 }
 
-let data = loadData();
+// Load all exercises
+for (const [name, cfg] of Object.entries(EXERCISES)) {
+  dataStore[name] = loadDataForKey(cfg.key, cfg.defaultGoal);
+}
 
+function activeData() { return dataStore[activeExercise]; }
+function activeConfig() { return EXERCISES[activeExercise]; }
+
+function saveData() {
+  saveDataForKey(activeConfig().key, activeData());
+}
+
+// ============ GOAL MANAGEMENT ============
+function getGoal(exerciseName) {
+  const name = exerciseName || activeExercise;
+  try {
+    const goals = JSON.parse(localStorage.getItem('exercise_goals') || '{}');
+    if (goals[name] && goals[name] >= EXERCISES[name].minGoal) return goals[name];
+  } catch (e) {}
+  return EXERCISES[name].defaultGoal;
+}
+
+function setGoal(exerciseName, value) {
+  const min = EXERCISES[exerciseName].minGoal;
+  const clamped = Math.max(min, Math.round(value));
+  try {
+    const goals = JSON.parse(localStorage.getItem('exercise_goals') || '{}');
+    goals[exerciseName] = clamped;
+    localStorage.setItem('exercise_goals', JSON.stringify(goals));
+  } catch (e) {}
+  return clamped;
+}
+
+// ============ DATA HELPERS ============
 function getDateStr(d) {
   const dt = d || new Date();
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 }
 
 function getOrCreateSession(dateStr) {
+  const data = activeData();
   let session = data.sessions.find(s => s.date === dateStr);
   if (!session) {
     session = { date: dateStr, entries: [] };
@@ -760,23 +895,23 @@ function getOrCreateSession(dateStr) {
   return session;
 }
 
-function totalSquats() {
+function totalCount() {
   let t = 0;
-  for (const s of data.sessions) for (const e of s.entries) t += e.count;
+  for (const s of activeData().sessions) for (const e of s.entries) t += e.count;
   return t;
 }
 
-function squatsForDate(dateStr) {
-  const s = data.sessions.find(s => s.date === dateStr);
+function countForDate(dateStr) {
+  const s = activeData().sessions.find(s => s.date === dateStr);
   if (!s) return 0;
   let t = 0;
   for (const e of s.entries) t += e.count;
   return t;
 }
 
-function squatsInRange(startDate, endDate) {
+function countInRange(startDate, endDate) {
   let t = 0;
-  for (const s of data.sessions) {
+  for (const s of activeData().sessions) {
     if (s.date >= startDate && s.date <= endDate) {
       for (const e of s.entries) t += e.count;
     }
@@ -819,6 +954,7 @@ function daysRemaining() {
 
 // ============ PERSONAL BESTS ============
 function updatePersonalBests(justSaved) {
+  const data = activeData();
   let bestSession = data.bestSession || 0;
   let newSessionRecord = false;
   for (const s of data.sessions) {
@@ -868,8 +1004,11 @@ function updatePersonalBests(justSaved) {
 
 // ============ MILESTONE CELEBRATIONS ============
 function checkMilestones(prevTotal) {
-  const total = totalSquats();
-  for (const m of MILESTONES) {
+  const total = totalCount();
+  const goal = getGoal();
+  const milestones = getMilestones(goal);
+  const data = activeData();
+  for (const m of milestones) {
     if (prevTotal < m && total >= m && !data.unlockedMilestones.includes(m)) {
       data.unlockedMilestones.push(m);
       saveData();
@@ -881,8 +1020,11 @@ function checkMilestones(prevTotal) {
 
 let milestoneTimeout = null;
 function showMilestoneCelebration(milestone) {
-  const md = MILESTONE_DATA[milestone];
-  const messages = MILESTONE_MESSAGES[milestone];
+  const goal = getGoal();
+  const label = activeConfig().label;
+  const md = getMilestoneData(goal, label)[milestone];
+  const messages = getMilestoneMessages(goal, label)[milestone];
+  if (!md || !messages) return;
   const message = messages[Math.floor(Math.random() * messages.length)];
 
   document.getElementById('milestoneIcon').textContent = md.icon;
@@ -902,11 +1044,13 @@ window.dismissMilestone = function() {
 };
 
 function renderMilestoneTicks() {
+  const goal = getGoal();
+  const milestones = getMilestones(goal);
   const bg = document.querySelector('.progress-bar-bg');
   bg.querySelectorAll('.milestone-tick').forEach(t => t.remove());
-  for (const m of MILESTONES) {
-    if (m >= GOAL) continue;
-    const pct = (m / GOAL) * 100;
+  for (const m of milestones) {
+    if (m >= goal) continue;
+    const pct = (m / goal) * 100;
     const tick = document.createElement('div');
     tick.className = 'milestone-tick';
     tick.style.left = pct + '%';
@@ -917,6 +1061,7 @@ function renderMilestoneTicks() {
 
 // ============ STREAK TRACKING ============
 function computeStreak() {
+  const data = activeData();
   const activeDates = new Set();
   for (const s of data.sessions) {
     let t = 0;
@@ -957,6 +1102,7 @@ function computeStreak() {
 
 function updateStreakUI() {
   computeStreak();
+  const data = activeData();
   const mainEl = document.getElementById('streakMain');
   const bestEl = document.getElementById('streakBest');
   mainEl.textContent = `🔥 ${data.currentStreak}-day streak`;
@@ -966,13 +1112,13 @@ function updateStreakUI() {
   const now = new Date();
   const hour = now.getHours();
   const today = getDateStr();
-  const todayCount = squatsForDate(today);
+  const todayCount = countForDate(today);
 
   if (hour >= 20 && todayCount === 0 && data.currentStreak > 0) {
     warningEl.textContent = `⚠️ Your ${data.currentStreak}-day streak ends at midnight!`;
     warningEl.classList.add('visible');
   } else if (hour >= 18 && todayCount === 0 && data.currentStreak > 0) {
-    warningEl.textContent = `Your ${data.currentStreak}-day streak is at risk — no squats today yet`;
+    warningEl.textContent = `Your ${data.currentStreak}-day streak is at risk — no ${activeConfig().label.toLowerCase()} today yet`;
     warningEl.classList.add('visible');
   } else {
     warningEl.classList.remove('visible');
@@ -989,21 +1135,26 @@ function updateStreakUI() {
 
 // ============ TAGLINE ============
 function updateTagline() {
-  const total = totalSquats();
+  const total = totalCount();
+  const goal = getGoal();
+  const milestones = getMilestones(goal);
+  const label = activeConfig().label;
+  const milestoneData = getMilestoneData(goal, label);
   const el = document.getElementById('tagline');
 
   let currentChapter = null;
-  for (let i = MILESTONES.length - 1; i >= 0; i--) {
-    if (total >= MILESTONES[i]) {
-      currentChapter = MILESTONE_DATA[MILESTONES[i]].chapter;
+  for (let i = milestones.length - 1; i >= 0; i--) {
+    if (total >= milestones[i]) {
+      currentChapter = milestoneData[milestones[i]].chapter;
       break;
     }
   }
 
+  const goalK = goal >= 1000 ? Math.round(goal / 1000) + 'K' : goal;
   if (currentChapter) {
-    el.innerHTML = `<span class="chapter">${currentChapter}</span> — ${total.toLocaleString()} squats done`;
+    el.innerHTML = `<span class="chapter">${currentChapter}</span> — ${total.toLocaleString()} ${label.toLowerCase()} done`;
   } else {
-    el.textContent = `Day ${dayOfYear()} of your 30K journey`;
+    el.textContent = `Day ${dayOfYear()} of your ${goalK} journey`;
   }
 }
 
@@ -1015,20 +1166,21 @@ let currentSessionCount = 0;
 
 // ============ STATS & RENDERING ============
 function updateUI() {
-  const total = totalSquats();
-  const pct = Math.min(100, (total / GOAL) * 100);
+  const goal = getGoal();
+  const total = totalCount();
+  const pct = Math.min(100, (total / goal) * 100);
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressText').innerHTML =
-    `<strong>${total.toLocaleString()}</strong> / ${GOAL.toLocaleString()} (${pct.toFixed(1)}%)`;
+    `<strong>${total.toLocaleString()}</strong> / ${goal.toLocaleString()} (${pct.toFixed(1)}%)`;
 
   document.getElementById('sessionCount').textContent = currentSessionCount;
 
-  const remaining = GOAL - total;
+  const remaining = goal - total;
   const perDay = remaining > 0 ? Math.ceil(remaining / daysRemaining()) : 0;
   document.getElementById('statPace').textContent = perDay.toLocaleString();
 
   const today = getDateStr();
-  const todayCount = squatsForDate(today);
+  const todayCount = countForDate(today);
   const remainingToday = Math.max(0, perDay - todayCount);
 
   // Session label: show remaining today during active session
@@ -1042,20 +1194,19 @@ function updateUI() {
   document.getElementById('statToday').textContent = `${todayCount.toLocaleString()} / ${perDay.toLocaleString()}`;
 
   const [weekStart, weekEnd] = getWeekRange();
-  const weekCount = squatsInRange(weekStart, weekEnd);
-  const now = new Date();
-  const dow = now.getDay();
+  const weekCount = countInRange(weekStart, weekEnd);
   const daysInWeek = 7;
   const weekTarget = perDay * daysInWeek;
   document.getElementById('statWeek').textContent = `${weekCount.toLocaleString()} / ${weekTarget.toLocaleString()}`;
 
   const [monthStart, monthEnd] = getMonthRange();
-  const monthCount = squatsInRange(monthStart, monthEnd);
+  const monthCount = countInRange(monthStart, monthEnd);
+  const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const monthTarget = perDay * daysInMonth;
   document.getElementById('statMonth').textContent = `${monthCount.toLocaleString()} / ${monthTarget.toLocaleString()}`;
 
-  const expected = Math.round((dayOfYear() / 365) * GOAL);
+  const expected = Math.round((dayOfYear() / 365) * goal);
   const delta = total - expected;
   const deltaEl = document.getElementById('statDelta');
   if (delta >= 0) {
@@ -1076,6 +1227,8 @@ function updateUI() {
 
 // ============ CALENDAR HEATMAP ============
 function renderHeatmap() {
+  const data = activeData();
+  const label = activeConfig().label.toLowerCase();
   const cellSize = 13;
   const cellGap = 2;
   const step = cellSize + cellGap;
@@ -1119,7 +1272,6 @@ function renderHeatmap() {
     if (dateStr > today) {
       fill = '#161616';
     } else if (count === 0) {
-      // Past days with 0 squats get dim red — missed day highlight (CD8)
       fill = dateStr === today ? '#1e1e1e' : '#2a1515';
     } else {
       const intensity = Math.min(1, count / Math.max(maxDay, 50));
@@ -1171,14 +1323,15 @@ function renderHeatmap() {
 function showHeatmapTooltip(rect, event) {
   const dateStr = rect.getAttribute('data-date');
   const count = parseInt(rect.getAttribute('data-count'));
+  const label = activeConfig().label.toLowerCase();
   const tooltip = document.getElementById('heatmapTooltip');
 
   const dateObj = new Date(dateStr + 'T12:00:00');
   const options = { weekday: 'short', month: 'short', day: 'numeric' };
   document.getElementById('htDate').textContent = dateObj.toLocaleDateString('en-US', options);
-  document.getElementById('htCount').textContent = count > 0 ? `${count} squats` : 'No squats';
+  document.getElementById('htCount').textContent = count > 0 ? `${count} ${label}` : `No ${label}`;
 
-  const session = data.sessions.find(s => s.date === dateStr);
+  const session = activeData().sessions.find(s => s.date === dateStr);
   if (session && session.entries.length > 0) {
     const details = session.entries.map((e, i) => {
       const time = new Date(e.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -1215,7 +1368,9 @@ function startSession() {
   btn.textContent = 'STOP SESSION';
   btn.className = 'btn btn-stop';
 
-  startCamera();
+  if (activeConfig().hasCamera) {
+    startCamera();
+  }
   updateUI();
 }
 
@@ -1229,13 +1384,15 @@ function stopSession() {
   btn.textContent = 'START SESSION';
   btn.className = 'btn btn-start';
 
-  stopCamera();
+  if (activeConfig().hasCamera) {
+    stopCamera();
+  }
   updateUI();
 }
 
 function saveCurrentEntry() {
   if (currentSessionCount <= 0) return;
-  const prevTotal = totalSquats();
+  const prevTotal = totalCount();
   const dateStr = sessionStartDate || getDateStr();
   const session = getOrCreateSession(dateStr);
   session.entries.push({
@@ -1295,7 +1452,7 @@ function playPopSound() {
 window.manualAdd = function(n) {
   if (!sessionActive) {
     // Quick add without session
-    const prevTotal = totalSquats();
+    const prevTotal = totalCount();
     const dateStr = getDateStr();
     const session = getOrCreateSession(dateStr);
     if (n > 0) {
@@ -1358,14 +1515,34 @@ let cameraStream = null;
 let useFrontCamera = true;
 let modelLoading = false;
 
-// Squat detection state
-let squatState = 'STANDING'; // STANDING or AT_BOTTOM
+// Detection state
+let exerciseState = 'STANDING'; // STANDING, AT_BOTTOM, AT_TOP, EXTENDED, HANGING
 let smoothedAngle = 160;
 let consecutiveFrames = 0;
 const EMA_ALPHA = 0.7;
 let bottomThreshold = 120;
 let standingThreshold = 160;
 let lastFrameTime = 0;
+
+// Sensitivity configs per exercise type
+const SENSITIVITY_CONFIG = {
+  squats:  { label: 'Squat Depth Sensitivity', min: 100, max: 140, defaultVal: 120, storageKey: 'squats30k_sensitivity' },
+  pushups: { label: 'Pushup Depth Sensitivity', min: 70, max: 120, defaultVal: 90, storageKey: 'pushups20k_sensitivity' },
+  pullups: { label: 'Pullup Top Sensitivity', min: 60, max: 100, defaultVal: 80, storageKey: 'pullups10k_sensitivity' },
+};
+
+function loadSensitivity() {
+  const cfg = SENSITIVITY_CONFIG[activeExercise];
+  if (!cfg) return;
+  const saved = localStorage.getItem(cfg.storageKey);
+  bottomThreshold = saved ? parseInt(saved) : cfg.defaultVal;
+}
+
+function saveSensitivity() {
+  const cfg = SENSITIVITY_CONFIG[activeExercise];
+  if (!cfg) return;
+  localStorage.setItem(cfg.storageKey, bottomThreshold);
+}
 
 async function loadModel() {
   if (poseLandmarker || modelLoading) return;
@@ -1438,7 +1615,7 @@ async function startCamera() {
     console.error('Camera error:', e);
     showCameraStatus('Camera denied — use +/- buttons', true);
     document.getElementById('cameraPlaceholder').style.display = 'flex';
-    document.getElementById('cameraPlaceholder').querySelector('span').textContent = 'Camera access denied';
+    document.getElementById('cameraPlaceholderText').textContent = 'Camera access denied';
   }
 }
 
@@ -1456,12 +1633,12 @@ function stopCamera() {
   if (vid) vid.style.display = 'none';
   if (cvs) cvs.style.display = 'none';
   document.getElementById('cameraPlaceholder').style.display = 'flex';
-  document.getElementById('cameraPlaceholder').querySelector('span').textContent = 'Camera activates when session starts';
+  updatePlaceholderTips();
   document.getElementById('flipBtn').classList.remove('visible');
   document.getElementById('cameraStatus').style.display = 'none';
 
-  // Reset squat state
-  squatState = 'STANDING';
+  // Reset detection state
+  exerciseState = 'STANDING';
   smoothedAngle = 160;
   consecutiveFrames = 0;
 }
@@ -1499,7 +1676,7 @@ function detectLoop() {
       const lm = result.landmarks[0];
       const ready = drawSkeleton(lm);
       if (ready) {
-        processSquat(lm);
+        processExercise(lm);
       } else {
         const statusEl = document.getElementById('cameraStatus');
         if (statusEl) {
@@ -1519,6 +1696,13 @@ function detectLoop() {
 
 function checkLandmarkReadiness(landmarks) {
   const minVis = 0.5;
+  if (activeExercise === 'pushups' || activeExercise === 'pullups') {
+    // Need shoulders + elbows + wrists
+    const lReady = landmarks[11].visibility > minVis && landmarks[13].visibility > minVis && landmarks[15].visibility > minVis;
+    const rReady = landmarks[12].visibility > minVis && landmarks[14].visibility > minVis && landmarks[16].visibility > minVis;
+    return lReady || rReady;
+  }
+  // Squats: need hips + knees + ankles
   const lReady = landmarks[23].visibility > minVis && landmarks[25].visibility > minVis && landmarks[27].visibility > minVis;
   const rReady = landmarks[24].visibility > minVis && landmarks[26].visibility > minVis && landmarks[28].visibility > minVis;
   return lReady || rReady;
@@ -1574,6 +1758,14 @@ function angle(a, b, c) {
   return deg;
 }
 
+// ============ EXERCISE-SPECIFIC POSE DETECTION ============
+function processExercise(landmarks) {
+  if (activeExercise === 'squats') processSquat(landmarks);
+  else if (activeExercise === 'pushups') processPushup(landmarks);
+  else if (activeExercise === 'pullups') processPullup(landmarks);
+  // burpees: no camera detection
+}
+
 function processSquat(landmarks) {
   // Indices: hip=23/24, knee=25/26, ankle=27/28
   const lHip = landmarks[23], rHip = landmarks[24];
@@ -1602,17 +1794,17 @@ function processSquat(landmarks) {
   // State machine with debounce (3 consecutive frames)
   const targetState = smoothedAngle < bottomThreshold ? 'AT_BOTTOM'
     : smoothedAngle > standingThreshold ? 'STANDING'
-    : squatState; // hysteresis zone
+    : exerciseState; // hysteresis zone
 
-  if (targetState !== squatState) {
+  if (targetState !== exerciseState) {
     consecutiveFrames++;
     if (consecutiveFrames >= 3) {
-      const prevState = squatState;
-      squatState = targetState;
+      const prevState = exerciseState;
+      exerciseState = targetState;
       consecutiveFrames = 0;
 
       // Count on AT_BOTTOM → STANDING
-      if (prevState === 'AT_BOTTOM' && squatState === 'STANDING') {
+      if (prevState === 'AT_BOTTOM' && exerciseState === 'STANDING') {
         incrementCount();
       }
     }
@@ -1624,9 +1816,127 @@ function processSquat(landmarks) {
   const statusEl = document.getElementById('cameraStatus');
   if (statusEl) {
     statusEl.style.display = 'block';
-    statusEl.textContent = squatState === 'AT_BOTTOM'
+    statusEl.textContent = exerciseState === 'AT_BOTTOM'
       ? `⬇ ${Math.round(smoothedAngle)}°`
       : `⬆ ${Math.round(smoothedAngle)}°`;
+    statusEl.className = 'camera-status';
+  }
+}
+
+function processPushup(landmarks) {
+  // Track elbow angle: shoulder → elbow → wrist
+  const lShoulder = landmarks[11], rShoulder = landmarks[12];
+  const lElbow = landmarks[13], rElbow = landmarks[14];
+  const lWrist = landmarks[15], rWrist = landmarks[16];
+
+  const minVis = 0.5;
+  const leftVisible = lShoulder.visibility > minVis && lElbow.visibility > minVis && lWrist.visibility > minVis;
+  const rightVisible = rShoulder.visibility > minVis && rElbow.visibility > minVis && rWrist.visibility > minVis;
+
+  if (!leftVisible && !rightVisible) return;
+
+  let elbowAngle;
+  if (leftVisible && rightVisible) {
+    elbowAngle = (angle(lShoulder, lElbow, lWrist) + angle(rShoulder, rElbow, rWrist)) / 2;
+  } else if (leftVisible) {
+    elbowAngle = angle(lShoulder, lElbow, lWrist);
+  } else {
+    elbowAngle = angle(rShoulder, rElbow, rWrist);
+  }
+
+  smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * elbowAngle;
+
+  const extendedThreshold = 150;
+  const targetState = smoothedAngle < bottomThreshold ? 'AT_BOTTOM'
+    : smoothedAngle > extendedThreshold ? 'EXTENDED'
+    : exerciseState;
+
+  if (targetState !== exerciseState) {
+    consecutiveFrames++;
+    if (consecutiveFrames >= 3) {
+      const prevState = exerciseState;
+      exerciseState = targetState;
+      consecutiveFrames = 0;
+
+      // Count on AT_BOTTOM → EXTENDED
+      if (prevState === 'AT_BOTTOM' && exerciseState === 'EXTENDED') {
+        incrementCount();
+      }
+    }
+  } else {
+    consecutiveFrames = 0;
+  }
+
+  const statusEl = document.getElementById('cameraStatus');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = exerciseState === 'AT_BOTTOM'
+      ? `⬇ ${Math.round(smoothedAngle)}°`
+      : `⬆ ${Math.round(smoothedAngle)}°`;
+    statusEl.className = 'camera-status';
+  }
+}
+
+function processPullup(landmarks) {
+  // Track elbow angle + wrist-above-shoulder check
+  const lShoulder = landmarks[11], rShoulder = landmarks[12];
+  const lElbow = landmarks[13], rElbow = landmarks[14];
+  const lWrist = landmarks[15], rWrist = landmarks[16];
+
+  const minVis = 0.5;
+  const leftVisible = lShoulder.visibility > minVis && lElbow.visibility > minVis && lWrist.visibility > minVis;
+  const rightVisible = rShoulder.visibility > minVis && rElbow.visibility > minVis && rWrist.visibility > minVis;
+
+  if (!leftVisible && !rightVisible) return;
+
+  let elbowAngle;
+  if (leftVisible && rightVisible) {
+    elbowAngle = (angle(lShoulder, lElbow, lWrist) + angle(rShoulder, rElbow, rWrist)) / 2;
+  } else if (leftVisible) {
+    elbowAngle = angle(lShoulder, lElbow, lWrist);
+  } else {
+    elbowAngle = angle(rShoulder, rElbow, rWrist);
+  }
+
+  // Check wrists above shoulders (y is inverted in screen coords — lower y = higher)
+  let wristsAbove = false;
+  if (leftVisible && rightVisible) {
+    wristsAbove = (lWrist.y < lShoulder.y) || (rWrist.y < rShoulder.y);
+  } else if (leftVisible) {
+    wristsAbove = lWrist.y < lShoulder.y;
+  } else {
+    wristsAbove = rWrist.y < rShoulder.y;
+  }
+
+  smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * elbowAngle;
+
+  const hangingThreshold = 140;
+  const targetState = (smoothedAngle < bottomThreshold && wristsAbove) ? 'AT_TOP'
+    : smoothedAngle > hangingThreshold ? 'HANGING'
+    : exerciseState;
+
+  if (targetState !== exerciseState) {
+    consecutiveFrames++;
+    if (consecutiveFrames >= 3) {
+      const prevState = exerciseState;
+      exerciseState = targetState;
+      consecutiveFrames = 0;
+
+      // Count on AT_TOP → HANGING
+      if (prevState === 'AT_TOP' && exerciseState === 'HANGING') {
+        incrementCount();
+      }
+    }
+  } else {
+    consecutiveFrames = 0;
+  }
+
+  const statusEl = document.getElementById('cameraStatus');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = exerciseState === 'AT_TOP'
+      ? `⬆ ${Math.round(smoothedAngle)}°`
+      : `⬇ ${Math.round(smoothedAngle)}°`;
     statusEl.className = 'camera-status';
   }
 }
@@ -1638,23 +1948,144 @@ function showCameraStatus(msg, isError) {
   el.className = isError ? 'camera-status error' : 'camera-status';
 }
 
+// ============ EXERCISE SWITCHING ============
+const CAMERA_TIPS = {
+  squats: {
+    text: 'Camera activates when session starts',
+    tips: ['Place phone on a stable surface, angled to see your full body', 'Stand 6–8 feet away', 'Hips, knees, and feet must be visible'],
+  },
+  pushups: {
+    text: 'Camera activates when session starts',
+    tips: ['Place phone to the side', 'Shoulders, elbows, and hands must be visible', 'Keep your body in frame'],
+  },
+  pullups: {
+    text: 'Camera activates when session starts',
+    tips: ['Place phone facing the bar', 'Upper body must be visible', 'Wrists should be visible above shoulders at top'],
+  },
+  burpees: {
+    text: 'Burpees use manual counting',
+    tips: ['Tap + to count reps', 'Start a session to track time', 'Use − to correct mistakes'],
+  },
+};
+
+function updatePlaceholderTips() {
+  const tips = CAMERA_TIPS[activeExercise];
+  document.getElementById('cameraPlaceholderText').textContent = tips.text;
+  const tipsEl = document.getElementById('setupTips');
+  tipsEl.innerHTML = tips.tips.map(t => `<li>${t}</li>`).join('');
+}
+
+window.switchExercise = function(name) {
+  if (name === activeExercise) return;
+
+  // If session active, confirm stop
+  if (sessionActive) {
+    if (!confirm(`Stop current ${activeConfig().label.toLowerCase()} session and switch?`)) return;
+    stopSession();
+  }
+
+  activeExercise = name;
+
+  // Update tab highlight
+  document.querySelectorAll('.exercise-tabs .tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.exercise === name);
+  });
+
+  // Swap CSS vars
+  const cfg = activeConfig();
+  document.documentElement.style.setProperty('--accent', cfg.color);
+  document.documentElement.style.setProperty('--accent2', cfg.color2);
+
+  // Update header
+  const goalK = getGoal() >= 1000 ? Math.round(getGoal() / 1000) + 'K' : getGoal();
+  document.getElementById('headerTitle').textContent = `${goalK} ${cfg.label.toUpperCase()} 2026`;
+
+  // Update page title
+  document.title = `${goalK} ${cfg.label} 2026`;
+
+  // Update camera placeholder tips
+  updatePlaceholderTips();
+
+  // Update sensitivity slider
+  updateSensitivityUI();
+
+  // Reset detection state
+  exerciseState = 'STANDING';
+  smoothedAngle = 160;
+  consecutiveFrames = 0;
+
+  // Load sensitivity for this exercise
+  loadSensitivity();
+
+  updateUI();
+};
+
+function updateSensitivityUI() {
+  const row = document.getElementById('sensitivityRow');
+  const cfg = SENSITIVITY_CONFIG[activeExercise];
+  if (!cfg) {
+    row.style.display = 'none';
+    return;
+  }
+  row.style.display = '';
+  document.getElementById('sensitivityRowLabel').textContent = cfg.label;
+  const slider = document.getElementById('sensitivitySlider');
+  slider.min = cfg.min;
+  slider.max = cfg.max;
+  const saved = localStorage.getItem(cfg.storageKey);
+  const val = saved ? parseInt(saved) : cfg.defaultVal;
+  slider.value = val;
+  bottomThreshold = val;
+  document.getElementById('sensitivityLabel').textContent = val + '°';
+}
+
 // ============ SETTINGS ============
 window.toggleSettings = function() {
   const panel = document.getElementById('settingsPanel');
   panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    // Refresh goal inputs
+    for (const [name, cfg] of Object.entries(EXERCISES)) {
+      const input = document.getElementById('goal' + name.charAt(0).toUpperCase() + name.slice(1));
+      if (input) input.value = getGoal(name);
+    }
+  }
 };
 
 window.updateSensitivity = function(val) {
   bottomThreshold = parseInt(val);
   document.getElementById('sensitivityLabel').textContent = val + '°';
+  saveSensitivity();
+};
+
+window.updateGoal = function(exerciseName, input) {
+  const min = EXERCISES[exerciseName].minGoal;
+  let val = parseInt(input.value);
+  if (isNaN(val) || val < min) val = min;
+  const clamped = setGoal(exerciseName, val);
+  input.value = clamped;
+  if (exerciseName === activeExercise) {
+    // Update header
+    const goalK = clamped >= 1000 ? Math.round(clamped / 1000) + 'K' : clamped;
+    document.getElementById('headerTitle').textContent = `${goalK} ${activeConfig().label.toUpperCase()} 2026`;
+    updateUI();
+  }
 };
 
 window.exportData = function() {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const exportObj = {};
+  for (const [name, cfg] of Object.entries(EXERCISES)) {
+    exportObj[name] = dataStore[name];
+  }
+  exportObj._goals = {};
+  for (const name of Object.keys(EXERCISES)) {
+    exportObj._goals[name] = getGoal(name);
+  }
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `squats30k_${getDateStr()}.json`;
+  a.download = `exercises_${getDateStr()}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Data exported');
@@ -1667,7 +2098,10 @@ window.importData = function(event) {
   reader.onload = (e) => {
     try {
       const imported = JSON.parse(e.target.result);
-      if (imported.year && imported.sessions) {
+
+      // Detect old single-exercise format
+      if (imported.year && imported.sessions && !imported.squats) {
+        // Old format — import as squats
         if (!imported.currentStreak) imported.currentStreak = 0;
         if (!imported.bestStreak) imported.bestStreak = 0;
         if (!imported.lastActiveDate) imported.lastActiveDate = null;
@@ -1675,14 +2109,37 @@ window.importData = function(event) {
         if (!imported.bestSession) imported.bestSession = 0;
         if (!imported.bestDay) imported.bestDay = 0;
         if (!imported.bestWeek) imported.bestWeek = 0;
-        data = imported;
+        dataStore.squats = imported;
+        saveDataForKey(EXERCISES.squats.key, imported);
         computeStreak();
         updatePersonalBests(false);
-        saveData();
         updateUI();
-        showToast('Data imported successfully');
+        showToast('Data imported as squats');
       } else {
-        showToast('Invalid data format');
+        // New multi-exercise format
+        for (const [name, cfg] of Object.entries(EXERCISES)) {
+          if (imported[name] && imported[name].sessions) {
+            const d = imported[name];
+            if (!d.currentStreak) d.currentStreak = 0;
+            if (!d.bestStreak) d.bestStreak = 0;
+            if (!d.lastActiveDate) d.lastActiveDate = null;
+            if (!d.unlockedMilestones) d.unlockedMilestones = [];
+            if (!d.bestSession) d.bestSession = 0;
+            if (!d.bestDay) d.bestDay = 0;
+            if (!d.bestWeek) d.bestWeek = 0;
+            dataStore[name] = d;
+            saveDataForKey(cfg.key, d);
+          }
+        }
+        if (imported._goals) {
+          for (const [name, val] of Object.entries(imported._goals)) {
+            if (EXERCISES[name]) setGoal(name, val);
+          }
+        }
+        computeStreak();
+        updatePersonalBests(false);
+        updateUI();
+        showToast('All data imported successfully');
       }
     } catch (err) {
       showToast('Failed to parse file');
@@ -1693,14 +2150,16 @@ window.importData = function(event) {
 };
 
 window.resetData = function() {
-  if (confirm('Are you sure? This will delete ALL squat data.')) {
-    if (confirm('Really? This cannot be undone.')) {
-      data = { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [] };
+  const exerciseLabel = activeConfig().label.toLowerCase();
+  const choice = confirm(`Reset ${exerciseLabel} data? (Cancel to keep, OK to reset ${exerciseLabel})\n\nTo reset ALL exercises, use the browser console.`);
+  if (choice) {
+    if (confirm(`Really? This will delete all ${exerciseLabel} data and cannot be undone.`)) {
+      dataStore[activeExercise] = freshData(getGoal());
       saveData();
       currentSessionCount = 0;
       if (sessionActive) stopSession();
       updateUI();
-      showToast('All data reset');
+      showToast(`${activeConfig().label} data reset`);
     }
   }
 };
@@ -1714,18 +2173,15 @@ function showToast(msg, isRecord) {
 }
 
 // ============ INIT ============
-// Load sensitivity from localStorage
-const savedSens = localStorage.getItem('squats30k_sensitivity');
-if (savedSens) {
-  bottomThreshold = parseInt(savedSens);
-  document.getElementById('sensitivitySlider').value = bottomThreshold;
-  document.getElementById('sensitivityLabel').textContent = bottomThreshold + '°';
-}
+// Load sensitivity for initial exercise
+loadSensitivity();
+updateSensitivityUI();
 
-// Save sensitivity on change
-document.getElementById('sensitivitySlider').addEventListener('change', () => {
-  localStorage.setItem('squats30k_sensitivity', bottomThreshold);
-});
+// Set initial goal inputs
+for (const [name, cfg] of Object.entries(EXERCISES)) {
+  const input = document.getElementById('goal' + name.charAt(0).toUpperCase() + name.slice(1));
+  if (input) input.value = getGoal(name);
+}
 
 computeStreak();
 updatePersonalBests(false);
