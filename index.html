@@ -1451,6 +1451,7 @@ function saveCurrentEntry() {
 
 function incrementCount() {
   currentSessionCount++;
+  repFlashUntil = performance.now() + 500;
   updateUI();
 
   // Haptic feedback
@@ -1567,6 +1568,25 @@ const EMA_ALPHA = 0.7;
 let bottomThreshold = 120;
 let standingThreshold = 160;
 let lastFrameTime = 0;
+
+// Phase cue state
+let phaseCueText = '';
+let phaseCueColor = '';
+let repFlashUntil = 0;
+
+// Rep cooldown
+let lastRepTime = 0;
+const MIN_REP_COOLDOWN = 300;
+
+// Spatial validation — squats (hip drop)
+let standingHipY = null;
+let bottomHipY = null;
+const HIP_DROP_MIN = 0.03;
+
+// Spatial validation — pushups (shoulder drop)
+let extendedShoulderY = null;
+let bottomShoulderY = null;
+const SHOULDER_DROP_MIN = 0.03;
 
 // Sensitivity configs per exercise type
 const SENSITIVITY_CONFIG = {
@@ -1685,6 +1705,13 @@ function stopCamera() {
   exerciseState = 'STANDING';
   smoothedAngle = 160;
   consecutiveFrames = 0;
+  lastRepTime = 0;
+  standingHipY = null;
+  bottomHipY = null;
+  extendedShoulderY = null;
+  bottomShoulderY = null;
+  phaseCueText = '';
+  repFlashUntil = 0;
 }
 
 window.flipCamera = async function() {
@@ -1792,7 +1819,40 @@ function drawSkeleton(landmarks) {
     }
   }
 
+  if (ready) drawPhaseCue();
+
   return ready;
+}
+
+function drawPhaseCue() {
+  const w = canvasEl.width;
+  const h = canvasEl.height;
+  canvasCtx.save();
+  // Counter-mirror text (canvas is scaleX(-1))
+  canvasCtx.scale(-1, 1);
+  canvasCtx.translate(-w, 0);
+
+  const now = performance.now();
+  if (now < repFlashUntil) {
+    // Flash "REP!" for 500ms
+    canvasCtx.font = 'bold 48px sans-serif';
+    canvasCtx.textAlign = 'center';
+    canvasCtx.lineWidth = 4;
+    canvasCtx.strokeStyle = 'black';
+    canvasCtx.strokeText('REP!', w / 2, h * 0.15);
+    canvasCtx.fillStyle = '#4caf50';
+    canvasCtx.fillText('REP!', w / 2, h * 0.15);
+  } else if (phaseCueText) {
+    canvasCtx.font = 'bold 32px sans-serif';
+    canvasCtx.textAlign = 'center';
+    canvasCtx.lineWidth = 3;
+    canvasCtx.strokeStyle = 'black';
+    canvasCtx.strokeText(phaseCueText, w / 2, h * 0.15);
+    canvasCtx.fillStyle = phaseCueColor || 'white';
+    canvasCtx.fillText(phaseCueText, w / 2, h * 0.15);
+  }
+
+  canvasCtx.restore();
 }
 
 function angle(a, b, c) {
@@ -1832,6 +1892,12 @@ function processSquat(landmarks) {
     kneeAngle = angle(rHip, rKnee, rAnkle);
   }
 
+  // Compute average hip Y for spatial validation
+  let avgHipY = null;
+  if (leftVisible && rightVisible) avgHipY = (lHip.y + rHip.y) / 2;
+  else if (leftVisible) avgHipY = lHip.y;
+  else avgHipY = rHip.y;
+
   // Exponential moving average
   smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * kneeAngle;
 
@@ -1847,13 +1913,31 @@ function processSquat(landmarks) {
       exerciseState = targetState;
       consecutiveFrames = 0;
 
-      // Count on AT_BOTTOM → STANDING
+      // Track hip positions
+      if (exerciseState === 'STANDING') standingHipY = avgHipY;
+      if (exerciseState === 'AT_BOTTOM') bottomHipY = avgHipY;
+
+      // Count on AT_BOTTOM → STANDING (with cooldown + hip drop check)
       if (prevState === 'AT_BOTTOM' && exerciseState === 'STANDING') {
-        incrementCount();
+        const now = performance.now();
+        const hipValid = standingHipY === null || bottomHipY === null || (bottomHipY - standingHipY > HIP_DROP_MIN);
+        if (now - lastRepTime >= MIN_REP_COOLDOWN && hipValid) {
+          lastRepTime = now;
+          incrementCount();
+        }
       }
     }
   } else {
     consecutiveFrames = 0;
+  }
+
+  // Phase cues
+  if (exerciseState === 'STANDING') {
+    phaseCueText = 'Go lower'; phaseCueColor = 'white';
+  } else if (exerciseState === 'AT_BOTTOM') {
+    phaseCueText = 'Good! Stand up'; phaseCueColor = '#4caf50';
+  } else {
+    phaseCueText = 'Keep going'; phaseCueColor = '#4fc3f7';
   }
 
   // Visual indicator on camera status
@@ -1888,6 +1972,12 @@ function processPushup(landmarks) {
     elbowAngle = angle(rShoulder, rElbow, rWrist);
   }
 
+  // Compute average shoulder Y for spatial validation
+  let avgShoulderY = null;
+  if (leftVisible && rightVisible) avgShoulderY = (lShoulder.y + rShoulder.y) / 2;
+  else if (leftVisible) avgShoulderY = lShoulder.y;
+  else avgShoulderY = rShoulder.y;
+
   smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * elbowAngle;
 
   const extendedThreshold = 150;
@@ -1902,13 +1992,31 @@ function processPushup(landmarks) {
       exerciseState = targetState;
       consecutiveFrames = 0;
 
-      // Count on AT_BOTTOM → EXTENDED
+      // Track shoulder positions
+      if (exerciseState === 'EXTENDED') extendedShoulderY = avgShoulderY;
+      if (exerciseState === 'AT_BOTTOM') bottomShoulderY = avgShoulderY;
+
+      // Count on AT_BOTTOM → EXTENDED (with cooldown + shoulder drop check)
       if (prevState === 'AT_BOTTOM' && exerciseState === 'EXTENDED') {
-        incrementCount();
+        const now = performance.now();
+        const shoulderValid = extendedShoulderY === null || bottomShoulderY === null || (bottomShoulderY - extendedShoulderY > SHOULDER_DROP_MIN);
+        if (now - lastRepTime >= MIN_REP_COOLDOWN && shoulderValid) {
+          lastRepTime = now;
+          incrementCount();
+        }
       }
     }
   } else {
     consecutiveFrames = 0;
+  }
+
+  // Phase cues
+  if (exerciseState === 'EXTENDED') {
+    phaseCueText = 'Go down'; phaseCueColor = 'white';
+  } else if (exerciseState === 'AT_BOTTOM') {
+    phaseCueText = 'Push up!'; phaseCueColor = '#4caf50';
+  } else {
+    phaseCueText = 'Lower...'; phaseCueColor = '#4fc3f7';
   }
 
   const statusEl = document.getElementById('cameraStatus');
@@ -1966,13 +2074,26 @@ function processPullup(landmarks) {
       exerciseState = targetState;
       consecutiveFrames = 0;
 
-      // Count on AT_TOP → HANGING
+      // Count on AT_TOP → HANGING (with cooldown)
       if (prevState === 'AT_TOP' && exerciseState === 'HANGING') {
-        incrementCount();
+        const now = performance.now();
+        if (now - lastRepTime >= MIN_REP_COOLDOWN) {
+          lastRepTime = now;
+          incrementCount();
+        }
       }
     }
   } else {
     consecutiveFrames = 0;
+  }
+
+  // Phase cues
+  if (exerciseState === 'HANGING') {
+    phaseCueText = 'Pull up!'; phaseCueColor = 'white';
+  } else if (exerciseState === 'AT_TOP') {
+    phaseCueText = 'Good! Lower down'; phaseCueColor = '#4caf50';
+  } else {
+    phaseCueText = 'Keep pulling'; phaseCueColor = '#4fc3f7';
   }
 
   const statusEl = document.getElementById('cameraStatus');
