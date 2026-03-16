@@ -327,6 +327,19 @@ header h1 {
   margin-top: 4px;
 }
 
+/* Tagline */
+.tagline {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+  min-height: 1.2em;
+}
+.tagline .chapter {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Streak Counter */
 .streak-bar {
   display: flex;
@@ -538,6 +551,7 @@ header h1 {
 <div class="container">
   <header>
     <h1>30K SQUATS 2026</h1>
+    <div class="tagline" id="tagline"></div>
   </header>
 
   <div class="camera-section" id="cameraSection">
@@ -555,7 +569,7 @@ header h1 {
 
   <div class="session-count">
     <div class="count" id="sessionCount">0</div>
-    <div class="label">this session</div>
+    <div class="label" id="sessionLabel">this session</div>
   </div>
 
   <div class="controls">
@@ -957,6 +971,26 @@ function updateStreakUI() {
   }
 }
 
+// ============ TAGLINE ============
+function updateTagline() {
+  const total = totalSquats();
+  const el = document.getElementById('tagline');
+
+  let currentChapter = null;
+  for (let i = MILESTONES.length - 1; i >= 0; i--) {
+    if (total >= MILESTONES[i]) {
+      currentChapter = MILESTONE_DATA[MILESTONES[i]].chapter;
+      break;
+    }
+  }
+
+  if (currentChapter) {
+    el.innerHTML = `<span class="chapter">${currentChapter}</span> — ${total.toLocaleString()} squats done`;
+  } else {
+    el.textContent = `Day ${dayOfYear()} of your 30K journey`;
+  }
+}
+
 // ============ UI STATE ============
 let sessionActive = false;
 let sessionStartDate = null;
@@ -979,6 +1013,16 @@ function updateUI() {
 
   const today = getDateStr();
   const todayCount = squatsForDate(today);
+  const remainingToday = Math.max(0, perDay - todayCount);
+
+  // Session label: show remaining today during active session
+  const sessionLabel = document.getElementById('sessionLabel');
+  if (sessionActive && remainingToday > 0) {
+    sessionLabel.textContent = `${remainingToday} remaining today`;
+  } else {
+    sessionLabel.textContent = 'this session';
+  }
+
   document.getElementById('statToday').textContent = `${todayCount.toLocaleString()} / ${perDay.toLocaleString()}`;
 
   const [weekStart, weekEnd] = getWeekRange();
@@ -1002,10 +1046,12 @@ function updateUI() {
     deltaEl.textContent = `${delta.toLocaleString()} ahead of schedule`;
     deltaEl.style.color = 'var(--accent2)';
   } else {
-    deltaEl.textContent = `${perDay.toLocaleString()}/day to hit 30K`;
+    const deficit = Math.abs(delta);
+    deltaEl.textContent = `Do ${(remainingToday + Math.ceil(deficit / 7)).toLocaleString()} today to get back on track`;
     deltaEl.style.color = 'var(--warning)';
   }
 
+  updateTagline();
   updateStreakUI();
   updatePersonalBests(false);
   renderMilestoneTicks();
