@@ -327,6 +327,39 @@ header h1 {
   margin-top: 4px;
 }
 
+/* Streak Counter */
+.streak-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.streak-bar .streak-main {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.streak-bar .streak-best {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.streak-warning {
+  display: none;
+  text-align: center;
+  padding: 10px 16px;
+  margin: 8px 0;
+  background: rgba(239, 83, 80, 0.15);
+  border: 1px solid rgba(239, 83, 80, 0.3);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--danger);
+}
+.streak-warning.visible { display: block; }
+
 /* Toast notification */
 .toast {
   position: fixed;
@@ -382,6 +415,12 @@ header h1 {
     <button class="btn btn-start" id="mainBtn" onclick="toggleSession()">START SESSION</button>
     <button class="btn btn-manual" onclick="manualAdd(1)">+</button>
   </div>
+
+  <div class="streak-bar" id="streakBar">
+    <span class="streak-main" id="streakMain">🔥 0-day streak</span>
+    <span class="streak-best" id="streakBest">Best: 0</span>
+  </div>
+  <div class="streak-warning" id="streakWarning"></div>
 
   <div class="progress-section">
     <div class="progress-bar-bg">
@@ -450,10 +489,15 @@ function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const d = JSON.parse(raw);
-      if (d.year === YEAR) return d;
+      if (d.year === YEAR) {
+        if (!d.currentStreak) d.currentStreak = 0;
+        if (!d.bestStreak) d.bestStreak = 0;
+        if (!d.lastActiveDate) d.lastActiveDate = null;
+        return d;
+      }
     }
   } catch (e) { console.error('Failed to load data', e); }
-  return { year: YEAR, goal: GOAL, sessions: [] };
+  return { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null };
 }
 
 function saveData() {
@@ -535,6 +579,78 @@ function daysRemaining() {
   return Math.max(1, Math.ceil(diff / 86400000));
 }
 
+// ============ STREAK TRACKING ============
+function computeStreak() {
+  const activeDates = new Set();
+  for (const s of data.sessions) {
+    let t = 0;
+    for (const e of s.entries) t += e.count;
+    if (t > 0) activeDates.add(s.date);
+  }
+
+  const today = getDateStr();
+  const yesterday = getDateStr(new Date(Date.now() - 86400000));
+
+  let startDate;
+  if (activeDates.has(today)) {
+    startDate = today;
+  } else if (activeDates.has(yesterday)) {
+    startDate = yesterday;
+  } else {
+    data.currentStreak = 0;
+    data.lastActiveDate = null;
+    return;
+  }
+
+  let streak = 0;
+  const d = new Date(startDate + 'T12:00:00');
+  while (true) {
+    const ds = getDateStr(d);
+    if (activeDates.has(ds)) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  data.currentStreak = streak;
+  data.lastActiveDate = activeDates.has(today) ? today : yesterday;
+  if (streak > data.bestStreak) data.bestStreak = streak;
+}
+
+function updateStreakUI() {
+  computeStreak();
+  const mainEl = document.getElementById('streakMain');
+  const bestEl = document.getElementById('streakBest');
+  mainEl.textContent = `🔥 ${data.currentStreak}-day streak`;
+  bestEl.textContent = `Best: ${data.bestStreak}`;
+
+  const warningEl = document.getElementById('streakWarning');
+  const now = new Date();
+  const hour = now.getHours();
+  const today = getDateStr();
+  const todayCount = squatsForDate(today);
+
+  if (hour >= 20 && todayCount === 0 && data.currentStreak > 0) {
+    warningEl.textContent = `⚠️ Your ${data.currentStreak}-day streak ends at midnight!`;
+    warningEl.classList.add('visible');
+  } else if (hour >= 18 && todayCount === 0 && data.currentStreak > 0) {
+    warningEl.textContent = `Your ${data.currentStreak}-day streak is at risk — no squats today yet`;
+    warningEl.classList.add('visible');
+  } else {
+    warningEl.classList.remove('visible');
+  }
+
+  if (todayCount === 0 && data.currentStreak > 0) {
+    if (hour >= 22) mainEl.style.color = 'var(--danger)';
+    else if (hour >= 18) mainEl.style.color = 'var(--warning)';
+    else mainEl.style.color = '';
+  } else {
+    mainEl.style.color = '';
+  }
+}
+
 // ============ UI STATE ============
 let sessionActive = false;
 let sessionStartDate = null;
@@ -584,6 +700,7 @@ function updateUI() {
     deltaEl.style.color = 'var(--warning)';
   }
 
+  updateStreakUI();
   renderHeatmap();
 }
 
@@ -719,6 +836,7 @@ function saveCurrentEntry() {
     startTime: sessionStartTime || new Date().toISOString(),
     endTime: new Date().toISOString()
   });
+  computeStreak();
   saveData();
 }
 
@@ -750,6 +868,7 @@ window.manualAdd = function(n) {
         }
       }
     }
+    if (n > 0) { computeStreak(); }
     saveData();
     updateUI();
     return;
@@ -1098,7 +1217,7 @@ window.importData = function(event) {
 window.resetData = function() {
   if (confirm('Are you sure? This will delete ALL squat data.')) {
     if (confirm('Really? This cannot be undone.')) {
-      data = { year: YEAR, goal: GOAL, sessions: [] };
+      data = { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null };
       saveData();
       currentSessionCount = 0;
       if (sessionActive) stopSession();
@@ -1129,7 +1248,12 @@ document.getElementById('sensitivitySlider').addEventListener('change', () => {
   localStorage.setItem('squats30k_sensitivity', bottomThreshold);
 });
 
+computeStreak();
+saveData();
 updateUI();
+
+// Re-check streak warning every minute
+setInterval(() => updateStreakUI(), 60000);
 </script>
 </body>
 </html>
