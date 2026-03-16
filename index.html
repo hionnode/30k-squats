@@ -448,6 +448,33 @@ header h1 {
   z-index: 1;
 }
 
+/* Records Section */
+.records-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.record-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px 8px;
+  text-align: center;
+}
+.record-card .value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.record-card .label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
 /* Toast notification */
 .toast {
   position: fixed;
@@ -465,6 +492,10 @@ header h1 {
   pointer-events: none;
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
+.toast.record {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #000;
+}
 
 /* Skeleton overlay colors */
 .skeleton-line { stroke: var(--accent); stroke-width: 3; }
@@ -539,6 +570,21 @@ header h1 {
   <div class="stat-card" style="margin: 12px 0; text-align:center;">
     <div class="value" id="statDelta" style="font-size:1.1rem;">-</div>
     <div class="label" id="statDeltaLabel">vs expected pace</div>
+  </div>
+
+  <div class="records-section">
+    <div class="record-card">
+      <div class="value" id="recordSession">0</div>
+      <div class="label">Best Session</div>
+    </div>
+    <div class="record-card">
+      <div class="value" id="recordDay">0</div>
+      <div class="label">Best Day</div>
+    </div>
+    <div class="record-card">
+      <div class="value" id="recordWeek">0</div>
+      <div class="label">Best Week</div>
+    </div>
   </div>
 
   <div class="heatmap-section">
@@ -616,11 +662,14 @@ function loadData() {
         if (!d.bestStreak) d.bestStreak = 0;
         if (!d.lastActiveDate) d.lastActiveDate = null;
         if (!d.unlockedMilestones) d.unlockedMilestones = [];
+        if (!d.bestSession) d.bestSession = 0;
+        if (!d.bestDay) d.bestDay = 0;
+        if (!d.bestWeek) d.bestWeek = 0;
         return d;
       }
     }
   } catch (e) { console.error('Failed to load data', e); }
-  return { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [] };
+  return { year: YEAR, goal: GOAL, sessions: [], currentStreak: 0, bestStreak: 0, lastActiveDate: null, unlockedMilestones: [], bestSession: 0, bestDay: 0, bestWeek: 0 };
 }
 
 function saveData() {
@@ -670,8 +719,8 @@ function squatsInRange(startDate, endDate) {
 }
 
 // ISO week: Monday-Sunday
-function getWeekRange() {
-  const now = new Date();
+function getWeekRange(refDate) {
+  const now = refDate || new Date();
   const day = now.getDay();
   const mondayOffset = day === 0 ? -6 : 1 - day;
   const monday = new Date(now);
@@ -700,6 +749,55 @@ function daysRemaining() {
   const end = new Date(YEAR, 11, 31);
   const diff = end - now;
   return Math.max(1, Math.ceil(diff / 86400000));
+}
+
+// ============ PERSONAL BESTS ============
+function updatePersonalBests(justSaved) {
+  let bestSession = data.bestSession || 0;
+  let newSessionRecord = false;
+  for (const s of data.sessions) {
+    for (const e of s.entries) {
+      if (e.count > bestSession) bestSession = e.count;
+    }
+  }
+  if (bestSession > (data.bestSession || 0)) newSessionRecord = true;
+  data.bestSession = bestSession;
+
+  let bestDay = 0;
+  let newDayRecord = false;
+  for (const s of data.sessions) {
+    let t = 0;
+    for (const e of s.entries) t += e.count;
+    if (t > bestDay) bestDay = t;
+  }
+  if (bestDay > (data.bestDay || 0)) newDayRecord = true;
+  data.bestDay = bestDay;
+
+  let bestWeek = 0;
+  let newWeekRecord = false;
+  const weekTotals = {};
+  for (const s of data.sessions) {
+    const d = new Date(s.date + 'T12:00:00');
+    const [weekStart] = getWeekRange(d);
+    let t = 0;
+    for (const e of s.entries) t += e.count;
+    weekTotals[weekStart] = (weekTotals[weekStart] || 0) + t;
+  }
+  for (const wt of Object.values(weekTotals)) {
+    if (wt > bestWeek) bestWeek = wt;
+  }
+  if (bestWeek > (data.bestWeek || 0)) newWeekRecord = true;
+  data.bestWeek = bestWeek;
+
+  document.getElementById('recordSession').textContent = data.bestSession.toLocaleString();
+  document.getElementById('recordDay').textContent = data.bestDay.toLocaleString();
+  document.getElementById('recordWeek').textContent = data.bestWeek.toLocaleString();
+
+  if (justSaved) {
+    if (newSessionRecord && bestSession > 0) showToast('🏆 New session record!', true);
+    else if (newDayRecord && bestDay > 0) showToast('🏆 New daily record!', true);
+    else if (newWeekRecord && bestWeek > 0) showToast('🏆 New weekly record!', true);
+  }
 }
 
 // ============ MILESTONE CELEBRATIONS ============
@@ -873,6 +971,7 @@ function updateUI() {
   }
 
   updateStreakUI();
+  updatePersonalBests(false);
   renderMilestoneTicks();
   renderHeatmap();
 }
@@ -1013,6 +1112,7 @@ function saveCurrentEntry() {
   computeStreak();
   saveData();
   checkMilestones(prevTotal);
+  updatePersonalBests(true);
 }
 
 function incrementCount() {
@@ -1078,7 +1178,10 @@ window.manualAdd = function(n) {
     }
     if (n > 0) { computeStreak(); }
     saveData();
-    if (n > 0) { checkMilestones(prevTotal); }
+    if (n > 0) {
+      checkMilestones(prevTotal);
+      updatePersonalBests(true);
+    }
     updateUI();
     return;
   }
@@ -1408,7 +1511,16 @@ window.importData = function(event) {
     try {
       const imported = JSON.parse(e.target.result);
       if (imported.year && imported.sessions) {
+        if (!imported.currentStreak) imported.currentStreak = 0;
+        if (!imported.bestStreak) imported.bestStreak = 0;
+        if (!imported.lastActiveDate) imported.lastActiveDate = null;
+        if (!imported.unlockedMilestones) imported.unlockedMilestones = [];
+        if (!imported.bestSession) imported.bestSession = 0;
+        if (!imported.bestDay) imported.bestDay = 0;
+        if (!imported.bestWeek) imported.bestWeek = 0;
         data = imported;
+        computeStreak();
+        updatePersonalBests(false);
         saveData();
         updateUI();
         showToast('Data imported successfully');
@@ -1436,11 +1548,12 @@ window.resetData = function() {
   }
 };
 
-function showToast(msg) {
+function showToast(msg, isRecord) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
+  toast.className = 'toast' + (isRecord ? ' record' : '');
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
+  setTimeout(() => { toast.classList.remove('show'); }, 2500);
 }
 
 // ============ INIT ============
@@ -1458,6 +1571,7 @@ document.getElementById('sensitivitySlider').addEventListener('change', () => {
 });
 
 computeStreak();
+updatePersonalBests(false);
 saveData();
 updateUI();
 
