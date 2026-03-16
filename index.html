@@ -448,6 +448,35 @@ header h1 {
   z-index: 1;
 }
 
+/* Heatmap tooltip */
+.heatmap-tooltip {
+  display: none;
+  position: fixed;
+  background: var(--surface2);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 10px 14px;
+  z-index: 400;
+  font-size: 0.8rem;
+  max-width: 220px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.heatmap-tooltip.show { display: block; }
+.heatmap-tooltip .ht-date {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.heatmap-tooltip .ht-count {
+  color: var(--accent2);
+  font-weight: 600;
+}
+.heatmap-tooltip .ht-sessions {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
 /* Records Section */
 .records-section {
   display: grid;
@@ -619,6 +648,13 @@ header h1 {
   <div class="milestone-subtitle" id="milestoneSubtitle"></div>
   <div class="milestone-chapter" id="milestoneChapter"></div>
   <div class="dismiss-hint">Tap to dismiss</div>
+</div>
+
+<!-- Heatmap Tooltip -->
+<div class="heatmap-tooltip" id="heatmapTooltip">
+  <div class="ht-date" id="htDate"></div>
+  <div class="ht-count" id="htCount"></div>
+  <div class="ht-sessions" id="htSessions"></div>
 </div>
 
 <script type="module">
@@ -1021,7 +1057,8 @@ function renderHeatmap() {
     if (dateStr > today) {
       fill = '#161616';
     } else if (count === 0) {
-      fill = '#1e1e1e';
+      // Past days with 0 squats get dim red — missed day highlight (CD8)
+      fill = dateStr === today ? '#1e1e1e' : '#2a1515';
     } else {
       const intensity = Math.min(1, count / Math.max(maxDay, 50));
       if (intensity < 0.25) fill = '#0e4429';
@@ -1030,7 +1067,7 @@ function renderHeatmap() {
       else fill = '#39d353';
     }
 
-    rects += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${fill}"><title>${dateStr}: ${count}</title></rect>`;
+    rects += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${fill}" data-date="${dateStr}" data-count="${count}" style="cursor:pointer"><title>${dateStr}: ${count}</title></rect>`;
 
     if (d.getMonth() !== lastMonth) {
       lastMonth = d.getMonth();
@@ -1055,11 +1092,46 @@ function renderHeatmap() {
   const container = document.getElementById('heatmapContainer');
   container.innerHTML = `<svg class="heatmap-svg" width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">${dayLabelsSvg}${rects}${monthLabels.join('')}</svg>`;
 
+  // Tappable heatmap cells
+  container.querySelector('svg').addEventListener('click', (e) => {
+    const rect = e.target.closest('rect[data-date]');
+    if (!rect) return;
+    showHeatmapTooltip(rect, e);
+  });
+
   // Auto-scroll to current week
   const currentDayOfYear = dayOfYear();
   const currentWeek = Math.floor((currentDayOfYear + startDow) / 7);
   const scrollTarget = Math.max(0, currentWeek * step - container.clientWidth / 2);
   container.scrollLeft = scrollTarget;
+}
+
+function showHeatmapTooltip(rect, event) {
+  const dateStr = rect.getAttribute('data-date');
+  const count = parseInt(rect.getAttribute('data-count'));
+  const tooltip = document.getElementById('heatmapTooltip');
+
+  const dateObj = new Date(dateStr + 'T12:00:00');
+  const options = { weekday: 'short', month: 'short', day: 'numeric' };
+  document.getElementById('htDate').textContent = dateObj.toLocaleDateString('en-US', options);
+  document.getElementById('htCount').textContent = count > 0 ? `${count} squats` : 'No squats';
+
+  const session = data.sessions.find(s => s.date === dateStr);
+  if (session && session.entries.length > 0) {
+    const details = session.entries.map((e, i) => {
+      const time = new Date(e.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      return `${time}: ${e.count} reps`;
+    }).join(' · ');
+    document.getElementById('htSessions').textContent = details;
+  } else {
+    document.getElementById('htSessions').textContent = '';
+  }
+
+  tooltip.style.left = Math.min(event.clientX + 10, window.innerWidth - 230) + 'px';
+  tooltip.style.top = (event.clientY - 60) + 'px';
+  tooltip.classList.add('show');
+
+  setTimeout(() => tooltip.classList.remove('show'), 3000);
 }
 
 // ============ SESSION MANAGEMENT ============
