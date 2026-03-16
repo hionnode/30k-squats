@@ -639,9 +639,9 @@ header h1 {
   </div>
 
   <div class="controls">
-    <button class="btn btn-manual minus" onclick="manualAdd(-1)">−</button>
+    <button class="btn btn-manual minus" id="btnMinus" onclick="manualAdd(-1)">−</button>
     <button class="btn btn-start" id="mainBtn" onclick="toggleSession()">START SESSION</button>
-    <button class="btn btn-manual" onclick="manualAdd(1)">+</button>
+    <button class="btn btn-manual" id="btnPlus" onclick="manualAdd(1)">+</button>
   </div>
 
   <div class="streak-bar" id="streakBar">
@@ -1493,6 +1493,7 @@ function playPopSound() {
 }
 
 window.manualAdd = function(n) {
+  if (activeConfig().hasCamera) return;
   if (!sessionActive) {
     // Quick add without session
     const prevTotal = totalCount();
@@ -2046,6 +2047,9 @@ window.switchExercise = function(name) {
   // Update page title
   document.title = `${goalK} ${cfg.label} 2026`;
 
+  // Toggle manual +/- buttons
+  updateManualButtons();
+
   // Update camera placeholder tips
   updatePlaceholderTips();
 
@@ -2062,6 +2066,12 @@ window.switchExercise = function(name) {
 
   updateUI();
 };
+
+function updateManualButtons() {
+  const hide = activeConfig().hasCamera;
+  document.getElementById('btnMinus').style.display = hide ? 'none' : '';
+  document.getElementById('btnPlus').style.display = hide ? 'none' : '';
+}
 
 function updateSensitivityUI() {
   const row = document.getElementById('sensitivityRow');
@@ -2482,6 +2492,7 @@ function showSyncNudge() {
 // Load sensitivity for initial exercise
 loadSensitivity();
 updateSensitivityUI();
+updateManualButtons();
 
 // Set initial goal inputs
 for (const [name, cfg] of Object.entries(EXERCISES)) {
