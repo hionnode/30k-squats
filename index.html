@@ -360,6 +360,25 @@ header h1 {
 }
 .streak-warning.visible { display: block; }
 
+/* Pulse animation for squat count */
+@keyframes countPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.session-count .count.pulse {
+  animation: countPulse 0.3s ease-out;
+}
+
+/* Screen flash on squat */
+@keyframes borderFlash {
+  0% { box-shadow: inset 0 0 0 3px var(--accent2); }
+  100% { box-shadow: inset 0 0 0 0px transparent; }
+}
+.camera-section.flash {
+  animation: borderFlash 0.4s ease-out;
+}
+
 /* Milestone Celebration Overlay */
 .milestone-overlay {
   display: none;
@@ -999,12 +1018,44 @@ function saveCurrentEntry() {
 function incrementCount() {
   currentSessionCount++;
   updateUI();
+
   // Haptic feedback
   if (navigator.vibrate) navigator.vibrate(50);
-  // Flash the count
+
+  // Pulse animation on count
   const el = document.getElementById('sessionCount');
+  el.classList.remove('pulse');
+  void el.offsetWidth; // force reflow to restart animation
+  el.classList.add('pulse');
   el.style.color = 'var(--accent2)';
-  setTimeout(() => el.style.color = 'white', 200);
+  setTimeout(() => el.style.color = 'white', 300);
+
+  // Screen flash on camera section
+  const cam = document.getElementById('cameraSection');
+  cam.classList.remove('flash');
+  void cam.offsetWidth;
+  cam.classList.add('flash');
+
+  // Audio pop feedback
+  playPopSound();
+}
+
+// Web Audio API short pop tone
+let audioCtx = null;
+function playPopSound() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.08);
+  } catch(e) { /* audio not available */ }
 }
 
 window.manualAdd = function(n) {
