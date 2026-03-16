@@ -103,7 +103,18 @@ header h1 {
   font-size: 0.75rem;
   font-weight: 600;
 }
-.camera-status.error { color: var(--danger); }
+.camera-status.error { color: var(--danger); font-size: 0.85rem; }
+.setup-tips {
+  list-style: none;
+  padding: 0;
+  margin: 8px 16px 0;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  opacity: 0.8;
+  text-align: left;
+}
+.setup-tips li::before { content: "· "; }
+.setup-tips li { margin: 4px 0; }
 .flip-btn {
   position: absolute;
   top: 8px;
@@ -560,6 +571,11 @@ header h1 {
         <path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9A2.25 2.25 0 004.5 18.75z"/>
       </svg>
       <span>Camera activates when session starts</span>
+      <ul class="setup-tips">
+        <li>Place phone on a stable surface, angled to see your full body</li>
+        <li>Stand 6–8 feet away</li>
+        <li>Hips, knees, and feet must be visible</li>
+      </ul>
     </div>
     <video id="video" autoplay playsinline style="display:none"></video>
     <canvas id="overlay" style="display:none"></canvas>
@@ -1481,8 +1497,17 @@ function detectLoop() {
 
     if (result.landmarks && result.landmarks.length > 0) {
       const lm = result.landmarks[0];
-      drawSkeleton(lm);
-      processSquat(lm);
+      const ready = drawSkeleton(lm);
+      if (ready) {
+        processSquat(lm);
+      } else {
+        const statusEl = document.getElementById('cameraStatus');
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.textContent = 'Step back — full body needed';
+          statusEl.className = 'camera-status error';
+        }
+      }
     }
   } catch (e) {
     // Silently continue on detection errors
@@ -1492,9 +1517,17 @@ function detectLoop() {
   animFrameId = requestAnimationFrame(detectLoop);
 }
 
+function checkLandmarkReadiness(landmarks) {
+  const minVis = 0.5;
+  const lReady = landmarks[23].visibility > minVis && landmarks[25].visibility > minVis && landmarks[27].visibility > minVis;
+  const rReady = landmarks[24].visibility > minVis && landmarks[26].visibility > minVis && landmarks[28].visibility > minVis;
+  return lReady || rReady;
+}
+
 function drawSkeleton(landmarks) {
   const w = canvasEl.width;
   const h = canvasEl.height;
+  const ready = checkLandmarkReadiness(landmarks);
 
   // Connections to draw
   const connections = [
@@ -1504,7 +1537,9 @@ function drawSkeleton(landmarks) {
     [27,29], [28,30], [29,31], [30,32] // feet
   ];
 
-  canvasCtx.strokeStyle = 'rgba(79, 195, 247, 0.7)';
+  canvasCtx.strokeStyle = ready
+    ? 'rgba(79, 195, 247, 0.7)'
+    : 'rgba(255, 152, 0, 0.7)';
   canvasCtx.lineWidth = 3;
 
   for (const [a, b] of connections) {
@@ -1517,7 +1552,9 @@ function drawSkeleton(landmarks) {
   }
 
   // Draw key points
-  canvasCtx.fillStyle = 'rgba(129, 199, 132, 0.9)';
+  canvasCtx.fillStyle = ready
+    ? 'rgba(129, 199, 132, 0.9)'
+    : 'rgba(239, 83, 80, 0.9)';
   const keyPoints = [11,12,13,14,15,16,23,24,25,26,27,28];
   for (const i of keyPoints) {
     if (landmarks[i].visibility > 0.3) {
@@ -1526,6 +1563,8 @@ function drawSkeleton(landmarks) {
       canvasCtx.fill();
     }
   }
+
+  return ready;
 }
 
 function angle(a, b, c) {
