@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0a0a0a"/>
+  <text x="256" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="900" font-size="110" fill="#4fc3f7">30K</text>
+  <text x="256" y="330" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="72" fill="#81c784">🏋️</text>
+  <text x="256" y="420" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="600" font-size="50" fill="#888">2026</text>
+</svg>
