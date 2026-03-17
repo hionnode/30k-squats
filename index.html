@@ -1046,6 +1046,15 @@ function dayOfYear() {
   return Math.floor(diff / 86400000);
 }
 
+function firstActiveDay() {
+  const sessions = activeData().sessions;
+  if (!sessions || sessions.length === 0) return dayOfYear();
+  const firstDate = sessions.reduce((min, s) => s.date < min ? s.date : min, sessions[0].date);
+  const d = new Date(firstDate + 'T12:00:00');
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+
 function daysRemaining() {
   const now = new Date();
   const end = new Date(YEAR, 11, 31);
@@ -1307,14 +1316,18 @@ function updateUI() {
   const monthTarget = perDay * daysInMonth;
   document.getElementById('statMonth').textContent = `${monthCount.toLocaleString()} / ${monthTarget.toLocaleString()}`;
 
-  const expected = Math.round((dayOfYear() / 365) * goal);
+  const activeDays = dayOfYear() - firstActiveDay() + 1;
+  const expected = Math.round((activeDays / 365) * goal);
   const delta = total - expected;
   const deltaEl = document.getElementById('statDelta');
-  if (delta >= 0) {
+  if (activeDays < 7) {
+    deltaEl.textContent = 'Too early to project pace';
+    deltaEl.style.color = 'var(--text-dim)';
+  } else if (delta >= 0) {
     deltaEl.textContent = `${delta.toLocaleString()} ahead of schedule`;
     deltaEl.style.color = 'var(--accent2)';
   } else {
-    const projected = Math.round((total / dayOfYear()) * 365);
+    const projected = Math.round((total / activeDays) * 365);
     deltaEl.textContent = `On pace for ${projected.toLocaleString()} this year`;
     deltaEl.style.color = 'var(--warning)';
   }
