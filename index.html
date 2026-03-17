@@ -1658,7 +1658,7 @@ const SHOULDER_DROP_MIN = 0.03;
 const SENSITIVITY_CONFIG = {
   squats:  { label: 'Squat Depth Sensitivity', min: 100, max: 140, defaultVal: 120, storageKey: 'squats30k_sensitivity' },
   pushups: { label: 'Pushup Depth Sensitivity', min: 70, max: 120, defaultVal: 90, storageKey: 'pushups20k_sensitivity' },
-  pullups: { label: 'Pullup Top Sensitivity', min: 60, max: 100, defaultVal: 80, storageKey: 'pullups10k_sensitivity' },
+  pullups: { label: 'Pullup Top Sensitivity', min: 70, max: 120, defaultVal: 90, storageKey: 'pullups10k_sensitivity' },
 };
 
 function loadSensitivity() {
@@ -1833,7 +1833,13 @@ function detectLoop() {
 
 function checkLandmarkReadiness(landmarks) {
   const minVis = 0.5;
-  if (activeExercise === 'pushups' || activeExercise === 'pullups') {
+  if (activeExercise === 'pullups') {
+    // Need shoulders + elbows + hips (shoulder angle detection)
+    const lReady = landmarks[11].visibility > minVis && landmarks[13].visibility > minVis && landmarks[23].visibility > minVis;
+    const rReady = landmarks[12].visibility > minVis && landmarks[14].visibility > minVis && landmarks[24].visibility > minVis;
+    return lReady || rReady;
+  }
+  if (activeExercise === 'pushups') {
     // Need shoulders + elbows + wrists
     const lReady = landmarks[11].visibility > minVis && landmarks[13].visibility > minVis && landmarks[15].visibility > minVis;
     const rReady = landmarks[12].visibility > minVis && landmarks[14].visibility > minVis && landmarks[16].visibility > minVis;
@@ -2096,40 +2102,30 @@ function processPushup(landmarks) {
 }
 
 function processPullup(landmarks) {
-  // Track elbow angle + wrist-above-shoulder check
+  // Track shoulder angle (elbow→shoulder→hip) — works from any camera angle
   const lShoulder = landmarks[11], rShoulder = landmarks[12];
   const lElbow = landmarks[13], rElbow = landmarks[14];
-  const lWrist = landmarks[15], rWrist = landmarks[16];
+  const lHip = landmarks[23], rHip = landmarks[24];
 
   const minVis = 0.5;
-  const leftVisible = lShoulder.visibility > minVis && lElbow.visibility > minVis && lWrist.visibility > minVis;
-  const rightVisible = rShoulder.visibility > minVis && rElbow.visibility > minVis && rWrist.visibility > minVis;
+  const leftVisible = lShoulder.visibility > minVis && lElbow.visibility > minVis && lHip.visibility > minVis;
+  const rightVisible = rShoulder.visibility > minVis && rElbow.visibility > minVis && rHip.visibility > minVis;
 
   if (!leftVisible && !rightVisible) return;
 
-  let elbowAngle;
+  let shoulderAngle;
   if (leftVisible && rightVisible) {
-    elbowAngle = (angle(lShoulder, lElbow, lWrist) + angle(rShoulder, rElbow, rWrist)) / 2;
+    shoulderAngle = (angle(lElbow, lShoulder, lHip) + angle(rElbow, rShoulder, rHip)) / 2;
   } else if (leftVisible) {
-    elbowAngle = angle(lShoulder, lElbow, lWrist);
+    shoulderAngle = angle(lElbow, lShoulder, lHip);
   } else {
-    elbowAngle = angle(rShoulder, rElbow, rWrist);
+    shoulderAngle = angle(rElbow, rShoulder, rHip);
   }
 
-  // Check wrists above shoulders (y is inverted in screen coords — lower y = higher)
-  let wristsAbove = false;
-  if (leftVisible && rightVisible) {
-    wristsAbove = (lWrist.y < lShoulder.y) || (rWrist.y < rShoulder.y);
-  } else if (leftVisible) {
-    wristsAbove = lWrist.y < lShoulder.y;
-  } else {
-    wristsAbove = rWrist.y < rShoulder.y;
-  }
-
-  smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * elbowAngle;
+  smoothedAngle = EMA_ALPHA * smoothedAngle + (1 - EMA_ALPHA) * shoulderAngle;
 
   const hangingThreshold = 140;
-  const targetState = (smoothedAngle < bottomThreshold && wristsAbove) ? 'AT_TOP'
+  const targetState = smoothedAngle < bottomThreshold ? 'AT_TOP'
     : smoothedAngle > hangingThreshold ? 'HANGING'
     : exerciseState;
 
@@ -2191,7 +2187,7 @@ const CAMERA_TIPS = {
   },
   pullups: {
     text: 'Camera activates when session starts',
-    tips: ['Place phone facing the bar', 'Upper body must be visible', 'Wrists should be visible above shoulders at top'],
+    tips: ['Place phone facing the bar', 'Full upper body and hips must be visible', 'Step back so elbows are in frame at the top'],
   },
   burpees: {
     text: 'Burpees use manual counting',
