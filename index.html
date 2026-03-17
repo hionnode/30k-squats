@@ -164,6 +164,68 @@ header h1 {
 }
 .flip-btn.visible { display: block; }
 
+/* Fullscreen session mode */
+body.session-fullscreen {
+  overflow: hidden;
+}
+body.session-fullscreen .container {
+  padding: 0;
+  max-width: none;
+}
+body.session-fullscreen header,
+body.session-fullscreen .exercise-tabs,
+body.session-fullscreen .streak-bar,
+body.session-fullscreen .streak-warning,
+body.session-fullscreen .progress-section,
+body.session-fullscreen .stats-grid,
+body.session-fullscreen .records-section,
+body.session-fullscreen .heatmap-section,
+body.session-fullscreen .settings-toggle,
+body.session-fullscreen .stat-card {
+  display: none !important;
+}
+body.session-fullscreen .camera-section {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  max-height: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+  margin: 0;
+  background: #000;
+}
+body.session-fullscreen .session-count {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 51;
+  background: rgba(0,0,0,0.5);
+  padding: 8px 24px;
+  border-radius: 20px;
+}
+body.session-fullscreen .session-count .count {
+  font-size: 5rem;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+}
+body.session-fullscreen .session-count .label {
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+body.session-fullscreen .controls {
+  position: fixed;
+  bottom: 24px;
+  left: 16px;
+  right: 16px;
+  z-index: 51;
+  margin: 0;
+}
+body.session-fullscreen .flip-btn {
+  z-index: 52;
+}
+body.session-fullscreen .camera-status {
+  z-index: 52;
+}
+
 /* Session Count */
 .session-count {
   text-align: center;
@@ -1409,6 +1471,7 @@ function startSession() {
 
   if (activeConfig().hasCamera) {
     startCamera();
+    document.body.classList.add('session-fullscreen');
   }
   updateUI();
 }
@@ -1419,6 +1482,9 @@ function stopSession() {
     saveCurrentEntry();
   }
   sessionActive = false;
+
+  document.body.classList.remove('session-fullscreen');
+  window.scrollTo(0, 0);
 
   const btn = document.getElementById('mainBtn');
   btn.textContent = 'START SESSION';
@@ -1494,7 +1560,7 @@ function playPopSound() {
 }
 
 window.manualAdd = function(n) {
-  if (activeConfig().hasCamera) return;
+  if (activeConfig().hasCamera && !sessionActive) return;
   if (!sessionActive) {
     // Quick add without session
     const prevTotal = totalCount();
@@ -2189,7 +2255,7 @@ window.switchExercise = function(name) {
 };
 
 function updateManualButtons() {
-  const hide = activeConfig().hasCamera;
+  const hide = activeConfig().hasCamera && !sessionActive;
   document.getElementById('btnMinus').style.display = hide ? 'none' : '';
   document.getElementById('btnPlus').style.display = hide ? 'none' : '';
 }
