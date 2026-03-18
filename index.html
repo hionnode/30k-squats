@@ -179,6 +179,7 @@ body.session-fullscreen .streak-warning,
 body.session-fullscreen .progress-section,
 body.session-fullscreen .stats-grid,
 body.session-fullscreen .records-section,
+body.session-fullscreen .badges-section,
 body.session-fullscreen .heatmap-section,
 body.session-fullscreen .settings-toggle,
 body.session-fullscreen .stat-card {
@@ -655,6 +656,109 @@ body.session-fullscreen .camera-status {
   color: #000;
 }
 
+/* Badge Gallery */
+.badges-section { margin: 16px 0; }
+.badges-section h3 {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.badge-count { color: var(--accent); font-weight: 700; }
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.badge-cat-label {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 0 2px;
+  border-bottom: 1px solid var(--surface2);
+  margin-bottom: 2px;
+}
+.badge-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 6px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.1s;
+}
+.badge-cell:active { transform: scale(0.95); }
+.badge-cell.earned { border-color: var(--badge-rarity-color, #888); }
+.badge-cell.locked { opacity: 0.3; filter: grayscale(1); }
+.badge-cell .badge-icon { font-size: 1.5rem; }
+.badge-cell .badge-title {
+  font-size: 0.5rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 2px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.badge-cell.earned .badge-title { color: var(--text); }
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+  50% { box-shadow: 0 0 12px 4px rgba(255, 215, 0, 0.4); }
+}
+.badge-cell.new { animation: badgePulse 1.5s ease-in-out infinite; }
+
+/* Badge Detail Overlay */
+.badge-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 500;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  cursor: pointer;
+}
+.badge-overlay.show { display: flex; }
+.badge-overlay canvas { border-radius: 16px; max-width: 90vw; max-height: 60vh; }
+.badge-overlay .share-btn {
+  margin-top: 16px;
+  padding: 12px 32px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #000;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.badge-overlay .badge-dismiss { font-size: 0.75rem; color: var(--text-dim); margin-top: 12px; }
+.toast.badge { border: 2px solid #ffd700; background: var(--surface); }
+.milestone-overlay .share-milestone-btn {
+  margin-top: 16px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #000;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  animation: milestoneIn 0.6s ease-out 0.35s both;
+}
+
 /* Skeleton overlay colors */
 .skeleton-line { stroke: var(--accent); stroke-width: 3; }
 .skeleton-point { fill: var(--accent2); }
@@ -758,6 +862,11 @@ body.session-fullscreen .camera-status {
     </div>
   </div>
 
+  <div class="badges-section">
+    <h3>Badges <span class="badge-count" id="badgeCount">0/0</span></h3>
+    <div class="badge-grid" id="badgeGrid"></div>
+  </div>
+
   <div class="heatmap-section">
     <h3>Year at a Glance</h3>
     <div class="heatmap-container" id="heatmapContainer"></div>
@@ -841,7 +950,15 @@ body.session-fullscreen .camera-status {
   <div class="milestone-title" id="milestoneTitle"></div>
   <div class="milestone-subtitle" id="milestoneSubtitle"></div>
   <div class="milestone-chapter" id="milestoneChapter"></div>
+  <button class="share-milestone-btn" onclick="event.stopPropagation(); shareCurrentMilestone()">Share Achievement</button>
   <div class="dismiss-hint">Tap to dismiss</div>
+</div>
+
+<!-- Badge Detail Overlay -->
+<div class="badge-overlay" id="badgeOverlay" onclick="dismissBadge()">
+  <canvas id="badgeCanvas" width="540" height="540"></canvas>
+  <button class="share-btn" onclick="event.stopPropagation(); shareBadgeFromOverlay()">Share Badge</button>
+  <div class="badge-dismiss">Tap to dismiss</div>
 </div>
 
 <!-- Heatmap Tooltip -->
@@ -913,6 +1030,325 @@ function getMilestoneMessages(goal, label) {
   });
   return msgs;
 }
+
+// ============ BADGE SYSTEM ============
+const RARITY = {
+  common: { label: 'Common', color: '#888' },
+  uncommon: { label: 'Uncommon', color: '#4caf50' },
+  rare: { label: 'Rare', color: '#2196f3' },
+  epic: { label: 'Epic', color: '#9c27b0' },
+  legendary: { label: 'Legendary', color: '#ffd700' },
+  mythic: { label: 'Mythic', color: '#ff6f61' },
+};
+
+const MILESTONE_RARITY = ['common','common','uncommon','uncommon','rare','rare','epic','epic','legendary'];
+
+const STREAK_BADGES = [
+  { days: 3, title: 'Getting Started', icon: '🌱', rarity: 'common' },
+  { days: 7, title: 'One Week Strong', icon: '💪', rarity: 'uncommon' },
+  { days: 14, title: 'Two Week Warrior', icon: '⚔️', rarity: 'uncommon' },
+  { days: 30, title: 'Monthly Machine', icon: '⚙️', rarity: 'rare' },
+  { days: 60, title: 'Two Month Titan', icon: '🏛️', rarity: 'epic' },
+  { days: 100, title: 'Century Streak', icon: '💯', rarity: 'legendary' },
+  { days: 365, title: 'Year-Round Beast', icon: '🐉', rarity: 'mythic' },
+];
+
+const VOLUME_BADGES = [
+  { type: 'session', count: 50, title: '50-Rep Session', icon: '⚡', rarity: 'common' },
+  { type: 'session', count: 100, title: 'Century Session', icon: '💥', rarity: 'uncommon' },
+  { type: 'session', count: 200, title: 'Double Century', icon: '🔥', rarity: 'rare' },
+  { type: 'day', count: 100, title: '100-Rep Day', icon: '📅', rarity: 'uncommon' },
+  { type: 'day', count: 300, title: '300-Rep Day', icon: '🗓️', rarity: 'rare' },
+  { type: 'week', count: 500, title: '500-Rep Week', icon: '📊', rarity: 'rare' },
+  { type: 'week', count: 1000, title: '1K Week', icon: '📈', rarity: 'epic' },
+];
+
+const CROSS_BADGES = [
+  { id: 'cross_dual', title: 'Dual Athlete', icon: '🤝', rarity: 'uncommon', desc: '2 exercises, 100+ each', need: 2, threshold: 100 },
+  { id: 'cross_tri', title: 'Tri-Force', icon: '🔺', rarity: 'rare', desc: '3 exercises, 100+ each', need: 3, threshold: 100 },
+  { id: 'cross_quad', title: 'Quad Beast', icon: '🦾', rarity: 'epic', desc: 'All 4 exercises, 100+ each', need: 4, threshold: 100 },
+  { id: 'cross_quarter', title: 'Quarter Everywhere', icon: '🌍', rarity: 'legendary', desc: '25% in all exercises' },
+];
+
+const HIDDEN_BADGES = [
+  { id: 'hidden_early', title: 'Early Bird', icon: '🌅', rarity: 'uncommon', desc: 'Session before 7am' },
+  { id: 'hidden_owl', title: 'Night Owl', icon: '🦉', rarity: 'uncommon', desc: 'Session after 10pm' },
+  { id: 'hidden_weekend', title: 'Weekend Warrior', icon: '🏖️', rarity: 'rare', desc: '5+ weekend sessions' },
+];
+
+function getAllBadgeDefs() {
+  const badges = [];
+  for (const [exName, cfg] of Object.entries(EXERCISES)) {
+    MILESTONE_PCTS.forEach((pct, i) => {
+      const parts = CHAPTER_DATA[i].chapterTitle.split(': ');
+      badges.push({
+        id: `milestone_${exName}_${i}`, category: 'milestone',
+        title: parts.length > 1 ? parts[1] : parts[0],
+        icon: CHAPTER_DATA[i].icon, rarity: MILESTONE_RARITY[i], exercise: exName,
+        desc: `${Math.round(pct * 100)}% of ${cfg.label} goal`,
+      });
+    });
+  }
+  for (const sb of STREAK_BADGES) {
+    badges.push({ id: `streak_${sb.days}`, category: 'streak', title: sb.title, icon: sb.icon, rarity: sb.rarity, desc: `${sb.days}-day streak` });
+  }
+  for (const [exName, cfg] of Object.entries(EXERCISES)) {
+    for (const vb of VOLUME_BADGES) {
+      badges.push({
+        id: `vol_${vb.type}_${vb.count}_${exName}`, category: 'volume',
+        title: vb.title, icon: vb.icon, rarity: vb.rarity, exercise: exName,
+        desc: `${vb.count} ${cfg.label.toLowerCase()} in a ${vb.type}`,
+      });
+    }
+  }
+  for (const cb of CROSS_BADGES) {
+    badges.push({ id: cb.id, category: 'cross', title: cb.title, icon: cb.icon, rarity: cb.rarity, desc: cb.desc });
+  }
+  for (const hb of HIDDEN_BADGES) {
+    badges.push({ id: hb.id, category: 'hidden', title: hb.title, icon: hb.icon, rarity: hb.rarity, desc: hb.desc });
+  }
+  return badges;
+}
+
+function loadBadges() { try { return JSON.parse(localStorage.getItem('badges_earned') || '{}'); } catch { return {}; } }
+function saveBadges(b) { localStorage.setItem('badges_earned', JSON.stringify(b)); }
+function hasBadge(id) { return !!loadBadges()[id]; }
+
+function earnBadge(id, exercise, value) {
+  const badges = loadBadges();
+  if (badges[id]) return false;
+  badges[id] = { earnedAt: new Date().toISOString(), exercise: exercise || null, value: value || null };
+  saveBadges(badges);
+  return true;
+}
+
+function getExerciseTotal(exName) {
+  let t = 0;
+  for (const s of dataStore[exName].sessions) for (const e of s.entries) t += e.count;
+  return t;
+}
+
+function checkAllBadges() {
+  let newBadges = [];
+  // Milestone badges
+  for (const [exName] of Object.entries(EXERCISES)) {
+    const total = getExerciseTotal(exName);
+    const goal = getGoal(exName);
+    MILESTONE_PCTS.forEach((pct, i) => {
+      if (total >= Math.round(pct * goal)) {
+        if (earnBadge(`milestone_${exName}_${i}`, exName, Math.round(pct * goal))) newBadges.push(`milestone_${exName}_${i}`);
+      }
+    });
+  }
+  // Streak badges
+  for (const [exName] of Object.entries(EXERCISES)) {
+    const best = dataStore[exName].bestStreak || 0;
+    for (const sb of STREAK_BADGES) {
+      if (best >= sb.days && earnBadge(`streak_${sb.days}`, exName, sb.days)) newBadges.push(`streak_${sb.days}`);
+    }
+  }
+  // Volume badges
+  for (const [exName] of Object.entries(EXERCISES)) {
+    const data = dataStore[exName];
+    for (const vb of VOLUME_BADGES) {
+      const id = `vol_${vb.type}_${vb.count}_${exName}`;
+      const met = vb.type === 'session' ? (data.bestSession || 0) >= vb.count
+        : vb.type === 'day' ? (data.bestDay || 0) >= vb.count
+        : (data.bestWeek || 0) >= vb.count;
+      if (met && earnBadge(id, exName, vb.count)) newBadges.push(id);
+    }
+  }
+  // Cross-exercise badges
+  for (const cb of CROSS_BADGES) {
+    let met = false;
+    if (cb.id === 'cross_quarter') {
+      met = Object.keys(EXERCISES).every(n => getExerciseTotal(n) >= getGoal(n) * 0.25);
+    } else {
+      met = Object.keys(EXERCISES).filter(n => getExerciseTotal(n) >= cb.threshold).length >= cb.need;
+    }
+    if (met && earnBadge(cb.id)) newBadges.push(cb.id);
+  }
+  // Hidden badges
+  for (const [exName] of Object.entries(EXERCISES)) {
+    for (const s of dataStore[exName].sessions) {
+      for (const e of s.entries) {
+        const hour = new Date(e.startTime).getHours();
+        if (hour < 7 && earnBadge('hidden_early', exName)) newBadges.push('hidden_early');
+        if (hour >= 22 && earnBadge('hidden_owl', exName)) newBadges.push('hidden_owl');
+      }
+    }
+  }
+  let weekendSessions = 0;
+  for (const [exName] of Object.entries(EXERCISES)) {
+    for (const s of dataStore[exName].sessions) {
+      const d = new Date(s.date + 'T12:00:00');
+      if (d.getDay() === 0 || d.getDay() === 6) {
+        let t = 0; for (const e of s.entries) t += e.count;
+        if (t > 0) weekendSessions++;
+      }
+    }
+  }
+  if (weekendSessions >= 5 && earnBadge('hidden_weekend')) newBadges.push('hidden_weekend');
+  // Toast for new non-milestone badges
+  const firstNew = newBadges.find(id => !id.startsWith('milestone_'));
+  if (firstNew) {
+    const def = getAllBadgeDefs().find(b => b.id === firstNew);
+    if (def) showBadgeToast(def.title);
+  }
+  return newBadges;
+}
+
+function showBadgeToast(title) {
+  const toast = document.getElementById('toast');
+  toast.textContent = `🏅 New Badge: ${title}`;
+  toast.className = 'toast badge show';
+  setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// Badge gallery
+function renderBadgeGallery() {
+  const allBadges = getAllBadgeDefs();
+  const earned = loadBadges();
+  document.getElementById('badgeCount').textContent = `${Object.keys(earned).length}/${allBadges.length}`;
+  const grid = document.getElementById('badgeGrid');
+  if (!grid) return;
+  const exBadges = allBadges.filter(b => b.exercise === activeExercise || !b.exercise);
+  const categories = [
+    { key: 'milestone', label: 'Milestones' },
+    { key: 'volume', label: 'Volume' },
+    { key: 'streak', label: 'Streaks' },
+    { key: 'cross', label: 'Multi-Exercise' },
+    { key: 'hidden', label: 'Hidden' },
+  ];
+  let html = '';
+  for (const cat of categories) {
+    const catBadges = exBadges.filter(b => b.category === cat.key);
+    if (!catBadges.length) continue;
+    html += `<div class="badge-cat-label">${cat.label}</div>`;
+    for (const badge of catBadges) {
+      const isEarned = !!earned[badge.id];
+      const rarityColor = RARITY[badge.rarity].color;
+      const showTitle = !isEarned && badge.category === 'hidden' ? '???' : badge.title;
+      const showIcon = !isEarned && badge.category === 'hidden' ? '❓' : badge.icon;
+      html += `<div class="badge-cell ${isEarned ? 'earned' : 'locked'}" style="--badge-rarity-color:${rarityColor}" onclick="${isEarned ? `showBadgeDetail('${badge.id}')` : `showBadgeRequirement('${badge.id}')`}"><span class="badge-icon">${showIcon}</span><span class="badge-title">${showTitle}</span></div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+
+// Badge detail overlay
+let currentBadgeId = null;
+window.showBadgeDetail = function(badgeId) {
+  currentBadgeId = badgeId;
+  const badge = getAllBadgeDefs().find(b => b.id === badgeId);
+  if (!badge) return;
+  renderBadgeCanvas(badge, document.getElementById('badgeCanvas'), 540);
+  document.getElementById('badgeOverlay').classList.add('show');
+};
+window.dismissBadge = function() {
+  document.getElementById('badgeOverlay').classList.remove('show');
+  currentBadgeId = null;
+};
+window.showBadgeRequirement = function(badgeId) {
+  const badge = getAllBadgeDefs().find(b => b.id === badgeId);
+  if (!badge) return;
+  showToast(`🔒 ${badge.category === 'hidden' ? 'Keep exploring to unlock this!' : badge.desc}`);
+};
+
+// Canvas badge rendering
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+function renderBadgeCanvas(badge, canvas, size) {
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const rarity = RARITY[badge.rarity];
+  const exCfg = badge.exercise ? EXERCISES[badge.exercise] : null;
+  const accent = exCfg ? exCfg.color : '#4fc3f7';
+  const accent2 = exCfg ? exCfg.color2 : '#81c784';
+  const earned = loadBadges()[badge.id];
+
+  // Background
+  ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, size, size);
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size*0.6);
+  grad.addColorStop(0, accent + '33'); grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
+
+  // Border with glow for epic+
+  const bw = size * 0.01;
+  ctx.strokeStyle = rarity.color; ctx.lineWidth = bw * 2;
+  if (['epic','legendary','mythic'].includes(badge.rarity)) { ctx.shadowColor = rarity.color; ctx.shadowBlur = 20; }
+  roundRect(ctx, bw, bw, size - bw*2, size - bw*2, size*0.05); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Icon backdrop
+  const iconY = size * 0.32;
+  ctx.beginPath(); ctx.arc(size/2, iconY, size*0.12, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+
+  // Icon
+  ctx.font = `${size*0.15}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(badge.icon, size/2, iconY);
+
+  // Title
+  ctx.font = `bold ${size*0.065}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.fillStyle = 'white'; ctx.fillText(badge.title, size/2, size*0.52);
+
+  // Description
+  ctx.font = `${size*0.04}px sans-serif`; ctx.fillStyle = accent;
+  ctx.fillText(badge.desc, size/2, size*0.60);
+
+  // Rarity label
+  ctx.font = `bold ${size*0.03}px sans-serif`; ctx.fillStyle = rarity.color;
+  ctx.fillText(rarity.label.toUpperCase(), size/2, size*0.68);
+
+  // Accent bar
+  const barGrad = ctx.createLinearGradient(size*0.2, 0, size*0.8, 0);
+  barGrad.addColorStop(0, accent); barGrad.addColorStop(1, accent2);
+  ctx.fillStyle = barGrad;
+  roundRect(ctx, size*0.2, size*0.75, size*0.6, size*0.008, size*0.004); ctx.fill();
+
+  // Branding + date
+  ctx.font = `${size*0.03}px sans-serif`; ctx.fillStyle = '#666';
+  ctx.fillText('30k-squats.xyz', size/2, size*0.85);
+  if (earned) {
+    ctx.fillText(new Date(earned.earnedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), size/2, size*0.90);
+  }
+}
+
+// Share functions
+async function shareBadge(badgeId) {
+  const badge = getAllBadgeDefs().find(b => b.id === badgeId);
+  if (!badge) return;
+  const shareCanvas = document.createElement('canvas');
+  renderBadgeCanvas(badge, shareCanvas, 1080);
+  const blob = await new Promise(r => shareCanvas.toBlob(r, 'image/png'));
+  const file = new File([blob], `badge-${badgeId}.png`, { type: 'image/png' });
+  const shareText = `I earned the "${badge.title}" badge! #30KSquats2026\n30k-squats.xyz`;
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ text: shareText, files: [file] }); return; } } catch {}
+  try { if (navigator.share) { await navigator.share({ text: shareText, url: 'https://30k-squats.xyz' }); return; } } catch {}
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `badge-${badgeId}.png`; a.click();
+  URL.revokeObjectURL(url); showToast('Badge image downloaded');
+}
+
+window.shareBadgeFromOverlay = function() { if (currentBadgeId) shareBadge(currentBadgeId); };
+
+// Milestone share integration
+let currentMilestoneExercise = null;
+let currentMilestoneValue = null;
+window.shareCurrentMilestone = function() {
+  if (!currentMilestoneExercise || !currentMilestoneValue) return;
+  const milestones = getMilestones(getGoal(currentMilestoneExercise));
+  const idx = milestones.indexOf(currentMilestoneValue);
+  if (idx >= 0) shareBadge(`milestone_${currentMilestoneExercise}_${idx}`);
+};
 
 // ============ DATA LAYER ============
 const dataStore = {};
@@ -1137,6 +1573,8 @@ function showMilestoneCelebration(milestone) {
   if (!md || !messages) return;
   const message = messages[Math.floor(Math.random() * messages.length)];
 
+  currentMilestoneExercise = activeExercise;
+  currentMilestoneValue = milestone;
   document.getElementById('milestoneIcon').textContent = md.icon;
   document.getElementById('milestoneTitle').textContent = md.title;
   document.getElementById('milestoneSubtitle').textContent = message;
@@ -1336,6 +1774,7 @@ function updateUI() {
   updateStreakUI();
   updatePersonalBests(false);
   renderMilestoneTicks();
+  renderBadgeGallery();
   renderHeatmap();
 }
 
@@ -1526,6 +1965,7 @@ function saveCurrentEntry() {
   saveData();
   checkMilestones(prevTotal);
   updatePersonalBests(true);
+  checkAllBadges();
 }
 
 function incrementCount() {
@@ -1596,6 +2036,7 @@ window.manualAdd = function(n) {
     if (n > 0) {
       checkMilestones(prevTotal);
       updatePersonalBests(true);
+      checkAllBadges();
     }
     updateUI();
     return;
@@ -2699,6 +3140,7 @@ for (const [name, cfg] of Object.entries(EXERCISES)) {
 computeStreak();
 updatePersonalBests(false);
 saveData();
+checkAllBadges();
 updateUI();
 updateSyncUI();
 
